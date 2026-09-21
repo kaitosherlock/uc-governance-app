@@ -1,8 +1,10 @@
 # ORCHESTRATION HANDOVER STATE
 
-- **Timestamp**: 2026-09-21T17:10:00Z
+- **Timestamp**: 2026-09-22T05:25:00Z
 - **Current Phase**: Phase 0 — Foundations. P0-02, P0-03 and P0-04 complete and verified. The application runs.
-- **Active Task**: none in flight. Next is P0-05 (API client and mocks), then P0-06 (fixtures) and P0-08 (capability matrix).
+- **Active Task**: none in flight. The frontend lane is out of quota with one queued fix; see below.
+- **Deployed**: https://uc-governance-7474654536971820.aws.databricksapps.com (workspace dbc-76001947-638a, mode connected_readonly, RUNNING).
+- **Published**: https://github.com/kaitosherlock/uc-governance-app (public).
 
 ## 1. COMPLETED MILESTONES
 
@@ -71,6 +73,19 @@
 ## 2. IN-PROGRESS / CURRENT BLOCKER
 
 Nothing in flight. No blocker to the next dispatch.
+
+**Queued on the frontend lane.** The section description renders twice. The fix was dispatched, the
+agent added the `strings.unavailable` group, then hit a real quota limit before wiring `routes.tsx`.
+Status `quota_exhausted`, session `0258ed5e`, resets around 05:00 UTC on 2026-09-22. Resume with
+`./scripts/resume.ps1 -Agent frontend`. Do not hand-patch it.
+
+**Deployment facts.** The Azure workspace `adb-7405611500888142` is banned from Databricks Apps at
+the platform level and cannot host this app. The AWS workspace `dbc-76001947-638a` works and is
+where it now runs. That workspace caps at 3 apps; `adadghg` was deleted with the user's explicit
+choice to free the slot. Redeploy after a change with:
+`databricks sync <bundle> /Workspace/Users/minh18052003@gmail.com/uc-governance-app --full` then
+`databricks apps deploy uc-governance --source-code-path /Workspace/Users/minh18052003@gmail.com/uc-governance-app`.
+The bundle is app.yaml, requirements.txt, backend/app and a freshly built frontend/dist.
 
 Open items that do not block Phase 0:
 
