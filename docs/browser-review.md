@@ -162,3 +162,40 @@ weak metaphor for attribute-based access rules.
 
 Empty pages, absent search, absent tables, and the unwired context bar data are all P0-05 and
 later. They are not counted against the review.
+
+
+---
+
+# Browser review, pass 2
+
+Date: 2026-09-22. Verified in the browser at 1440x900 after the design fixes.
+
+## Fixed and confirmed
+
+| Finding | Evidence |
+|---|---|
+| B1 fake loading state | `document.querySelectorAll('.animate-pulse').length` is 0. The banner reads "Workspace context not connected" and its accessible name is "Workspace and identity context", not "Content is loading". |
+| B2 contrast | Nav text computes to `rgb(109, 105, 100)`, which is `#6D6964` at 5.2 to 1 on paper. Semantic tokens now separate text, icon and border roles from the raw ramp. |
+| B3 no headings | `h1` renders per route. Confirmed "Data Assets". |
+| B4 phantom fonts | Body font resolves to `ui-sans-serif, -apple-system, "Segoe UI Variable Text", …`. No unloadable family is claimed. |
+| G1 backlog language | No occurrence of task, route, or placeholder in user-facing copy. Data Assets now reads "Browse catalogs, schemas, and tables to see who can access them." |
+| G2 floating card | Replaced by a page header and a left-aligned section. No card, no centring. |
+| G3 error copy | Rewritten to active voice with next steps and no "please". |
+| G4 no identity | Product name renders in the rail. The Policies icon is now a sliders glyph rather than a book. |
+
+## Open, queued for resume
+
+**One regression remains.** The section description renders twice: once as the `PageHeader`
+description and again as the section body. Confirmed in the DOM, two identical paragraphs inside
+`main`.
+
+The fix was dispatched and landed only halfway. The agent added the `strings.unavailable` group and
+then hit a real quota limit before wiring `routes.tsx` to use it. The task is deferred, not failed,
+and sits in the resume queue as `P0-04`, session `0258ed5e`. It resumes with:
+
+```powershell
+./scripts/resume.ps1 -Agent frontend
+```
+
+The orchestrator deliberately did not patch this by hand. Doing so would hide the blocker and break
+the ownership model the pipeline depends on.
