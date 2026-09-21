@@ -1,0 +1,9 @@
+{
+  "success": false,
+  "code": "FORBIDDEN_ROLE",
+  "message": "Your application role (Viewer) cannot request permission changes.",
+  "correlation_id": "c0ffee00-0000-4000-8000-000000000006",
+  "next_steps": [
+    "Ask an Access Administrator to make this change, or submit an access request from the Access tab."
+  ]
+}

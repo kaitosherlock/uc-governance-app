@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "data": {
+    "mode": "fixture",
+    "mode_label": "Demo — synthetic data",
+    "environment_label": "DEV",
+    "workspace_host": "https://demo.example.test",
+    "workspace_id": null,
+    "managed_catalogs": ["sales", "hr", "shared_ref"],
+    "support_contact": "data-platform@example.test",
+    "bootstrap_allowlist_active": false,
+    "warehouse_configured": true,
+    "durable_store_configured": true,
+    "account_client_configured": false
+  },
+  "meta": {
+    "source": "fixture",
+    "observed_at": "2026-09-21T09:00:00Z",
+    "scope": null,
+    "completeness": "complete",
+    "limitations": ["All data on this screen is synthetic."],
+    "correlation_id": "c0ffee00-0000-4000-8000-000000000001"
+  }
+}

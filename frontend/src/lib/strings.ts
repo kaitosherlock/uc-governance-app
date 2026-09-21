@@ -1,0 +1,128 @@
+/**
+ * strings.ts — Every user-visible English string in the application.
+ *
+ * Organised by area. No component may contain a hard-coded English sentence.
+ * Object names, principal names, and privilege identifiers are never translated
+ * or reworded (they come from data, not from this file).
+ */
+
+export const strings = {
+  /** Application-wide */
+  app: {
+    title: "Unity Catalog Governance",
+    skipToContent: "Skip to main content",
+  },
+
+  /** Left-rail navigation labels */
+  nav: {
+    primaryNavLabel: "Primary navigation",
+    dataAssets: "Data Assets",
+    accessManagement: "Access Management",
+    policies: "Policies",
+    activity: "Activity",
+    platform: "Platform",
+  },
+
+  /** Context bar labels */
+  context: {
+    barLabel: "Workspace and identity context",
+    barLoadingLabel: "Loading workspace context",
+    notConnected: "Workspace context not connected",
+    modeLabel: "Mode",
+    environmentLabel: "Environment",
+    workspaceLabel: "Workspace",
+    scopeLabel: "Managed scope",
+    actorLabel: "Signed in as",
+    executorLabel: "Executor",
+    executorSentence:
+      "You are requesting this change. It will be executed by the application's service principal {name}.",
+    noScope: "No catalogs in scope",
+    unknownWorkspace: "Unknown workspace",
+  },
+
+  /** Common labels */
+  common: {
+    loading: "Loading…",
+    retry: "Retry",
+    cancel: "Cancel",
+    close: "Close",
+    save: "Save",
+    confirm: "Confirm",
+    back: "Back",
+    next: "Next",
+    search: "Search",
+    noResults: "No results found.",
+    copyToClipboard: "Copy to clipboard",
+    copied: "Copied",
+    notApplicable: "N/A",
+    unknown: "Unknown",
+    viewDetails: "View details",
+    learnMore: "Learn more",
+  },
+
+  /** UI states */
+  states: {
+    loading: "Loading data…",
+    loadingSkeleton: "Loading",
+    empty: "There is nothing here yet. Select a scope or use the navigation to get started.",
+    emptyGrants:
+      "No grants visible to the application on this object.",
+    emptyAssets: "No assets found in this scope.",
+    idle: "Select a scope to get started.",
+    notImplemented: "This feature is not yet available.",
+    notConfigured: "This feature requires additional configuration.",
+  },
+
+  /** Error messages */
+  errors: {
+    generic:
+      "Something went wrong. Copy the correlation ID below and contact your administrator to report this failure.",
+    networkError:
+      "Unable to reach the server. Check your connection and try again.",
+    notFound:
+      "Not found, or not visible to the application. Verify the name and check that the application has access.",
+    forbidden:
+      "Your role does not have permission for this action. Ask an access administrator to grant you the required privilege.",
+    unauthorized:
+      "Your session has expired. Sign in again to continue.",
+    modeReadOnly:
+      "This instance is in read-only mode. Write operations are not available.",
+    rateLimit:
+      "Too many requests. Wait a moment, then try again.",
+    upstream:
+      "An upstream service is unavailable. Try again in a few minutes.",
+    correlationPrefix: "Correlation ID:",
+    nextStepsPrefix: "Suggested next steps:",
+  },
+
+  /** Page headings */
+  pages: {
+    dataAssets: "Data Assets",
+    asset: "Asset",
+    accessManagement: "Access Management",
+    policies: "Policies",
+    activity: "Activity",
+    platform: "Platform",
+    notFound: "Page not found",
+  },
+
+  /** Descriptions for sections that are not yet available */
+  descriptions: {
+    dataAssets:
+      "Browse catalogs, schemas, and tables to see who can access them. Asset search is not available yet.",
+    assetDetail:
+      "View asset details including ownership, access grants, tags, lineage, and quality. This section is not available yet.",
+    accessManagement:
+      "Manage grants, revocations, and ownership transfers across your catalog. Review and approve access changes. This section is not available yet.",
+    policies:
+      "Define attribute-based access policies, row filters, column masks, and governed tags. This section is not available yet.",
+    activity:
+      "Review Databricks audit events, application activity, and governance findings. This section is not available yet.",
+    platform:
+      "Manage storage credentials, external locations, workspace bindings, connections, and sharing. This section is not available yet.",
+    notFound:
+      "That page does not exist. Use the navigation to get back to a section you can open.",
+  },
+} as const;
+
+export type Strings = typeof strings;

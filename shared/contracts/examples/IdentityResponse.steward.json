@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "data": {
+    "actor": {
+      "id": "u-1001",
+      "display": "alice.steward@example.test",
+      "kind": "user",
+      "roles": ["steward", "access_admin"],
+      "verified_by": "fixture"
+    },
+    "executor": {
+      "kind": "service_principal",
+      "display": "uc-governance-app (sp-7f3a…)",
+      "reason": "The Unity Catalog grants API is not in the user-authorization scope set, so the application's service principal executes governance changes."
+    }
+  },
+  "meta": {
+    "source": "fixture",
+    "observed_at": "2026-09-21T09:00:01Z",
+    "scope": null,
+    "completeness": "complete",
+    "limitations": [],
+    "correlation_id": "c0ffee00-0000-4000-8000-000000000002"
+  }
+}

@@ -1,0 +1,56 @@
+[project]
+name = "uc-governance-app"
+version = "0.1.0"
+description = "Unity Catalog governance application for Databricks Apps."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.53.0",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "databricks-sdk==0.140.0",
+    "psycopg[binary]==3.3.6",
+    "python-multipart==0.0.32",
+    "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.16.8",
+    "mypy==2.3.1",
+    "schemathesis==4.27.5",
+    "jsonschema==4.26.0",
+    "pyyaml==6.0.3",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+files = ["backend/app"]
+python_version = "3.11"
+warn_unused_ignores = true
+disallow_any_generics = true
+
+[[tool.mypy.overrides]]
+module = ["databricks.*"]
+# The databricks package ships partial stubs.
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["psycopg.*"]
+# The psycopg package ships partial stubs.
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+markers = ["live: requires an authorized sandbox workspace; opt-in"]
+addopts = '--strict-markers -m "not live"'

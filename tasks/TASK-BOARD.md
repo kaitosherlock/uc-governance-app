@@ -1,0 +1,104 @@
+# TASK BOARD
+
+Owner values: `codex` (Backend Coder), `antigravity` (Frontend Coder), `either`. Status values:
+`todo`, `in_progress`, `done`, `blocked`.
+
+> **Lane status 2026-09-21, updated.** Both lanes are live. `codex` is installed and authenticated;
+> `agy` is installed. Neither agent can do everything, though: codex has no network and agy cannot
+> run shell commands in headless mode, so **the orchestrator runs every package manager and
+> verification command**. See `docs/09-orchestration-playbook.md` section 2b.
+Claim a task by editing its row (see `HANDOFF-PROTOCOL.md`). Spec column cites `docs/00-spec.md`
+sections. Keep `Evidence` factual: command + result summary, file paths.
+
+**Gate 1 is complete and is not a task.** `shared/contracts/` is frozen at v1.0.0 and validated
+(`docs/test-results/contract-validation.txt`). No task may edit it; see `AGENTS.md`.
+
+Dispatch is orchestrator-driven: `./scripts/dispatch.ps1 -Agent <backend|frontend> -Tier <tier>
+-TaskId <ID> -PromptFile .ai/prompts/<ID>.md`. Tier guidance is in `docs/09-orchestration-playbook.md`.
+
+## Phase 0 — Foundations
+
+| ID | Task | Owner | Depends on | Spec | Status | Started | Evidence |
+|---|---|---|---|---|---|---|---|
+| P0-01 | Verify the UNVERIFIED items in `docs/04-databricks-apps-constraints.md` §8 (limits/timeouts page, WebSocket/SSE, egress, GA/Preview status of ABAC/tag-policies/RFA/classification/quality/lineage APIs). Update the doc with dates and links | codex | — | §3.1, §5 | todo | | |
+| P0-02 | Finalize `docs/03-technology-decision.md`: confirm versions on PyPI/npm, create `pyproject.toml` + `uv.lock` + `requirements.txt` (exact pins) and `frontend/package.json` + `package-lock.json` (exact pins). Record versions in the doc | either (codex py, antigravity npm) | — | §3 | done | 2026-09-21 | antigravity: frontend/package.json, frontend/tsconfig.json (baseUrl removed for TS forward-compat, paths intact), frontend/tsconfig.node.json, frontend/vite.config.ts, frontend/.gitignore |
+| P0-03 | Backend scaffold: `backend/app/main.py` factory; `config/` with `UCGOV_MODE` enum + Apps-env guard; `/api/v1/me`, `/context`, `/capabilities`; error envelope + exception handlers; `X-Request-Id`/correlation middleware; redaction log filter; static `dist/` mount; `export_openapi` tool | codex | P0-02 | §6, §8, §12 | done | 2026-09-21 | **Orchestrator-verified.** 23 modules under backend/app, 10 test files. Gate 2 clean on attempt 3: ruff `All checks passed`, mypy `no issues found in 24 source files`, pytest `137 passed`. Live fixture-mode run: all three endpoints return the exact envelope; `X-Request-Id` echoed into `meta.correlation_id`; unknown path returns 404 `NOT_FOUND`, never HTTP 200; cross-site POST returns 403; fixture mode refuses to start when `DATABRICKS_APP_PORT` or `DATABRICKS_CLIENT_ID` is present; missing `UCGOV_MODE` fails validation. OpenAPI parity: 3 paths implemented, all in the contract, none invented. Evidence `docs/test-results/gate2-backend.txt` |
+| P0-04 | Frontend scaffold: Vite + React 19 + TS + Tailwind v4 + shadcn init; `design/tokens.css` from `docs/07` §4; app shell with left rail, `ContextBar` (mode/env/workspace/actor/executor), router with scope URL; `strings.ts` | antigravity | P0-02 | §11.1–11.3 | done | 2026-09-21 | **Orchestrator-verified.** 14 files under frontend/. Gate 3 clean on attempt 4. Design review fixes applied: (1) ContextBar three-state (loading/not-connected/full); (2) semantic colour tokens for WCAG AA contrast; (3) PageHeader with h1 on every route; (4) system-resident font stacks; (5) left-aligned page content; (6) user-facing copy; (7) theme-color meta, color-scheme light, SlidersHorizontal for Policies, visible env label. |
+| P0-05 | `src/api/client.ts`: the only `fetch`; prefixes `/api/v1`, URL-encodes `full_name`, parses the envelope, narrows on `success`, throws typed `ApiError`, forwards `AbortSignal`, treats 202 as `Operation.status === 'unknown'`. Types come from `@contracts/types`, nothing is generated from a running server. Plus MSW handlers built from `shared/contracts/examples/` with `?scenario=` variants | antigravity | P0-04 | §6, §12 | todo | | |
+| P0-06 | Fixture dataset v1 (see `docs/01-plan.md` P0-06 for contents) under `backend/app/fixtures_data/`; fixture adapters implementing the same Protocols as SDK adapters; scenario switches (success/partial/forbidden/stale/not_configured/unknown) | codex | P0-03 | §12 | todo | | |
+| P0-07 | Tooling: eslint/vitest/playwright config files; `scripts/check_all.ps1` + `.sh` (must invoke `scripts/validate_contracts.py --no-project` first); **a root `.gitignore` covering `.venv/`, `node_modules/`, `dist/`, `__pycache__/`, `.ai/logs/` so `databricks sync` never uploads them**. ruff/mypy/pytest config already landed in `pyproject.toml` via P0-02 | either | P0-03, P0-04 | §14 | todo | | |
+| P0-09 | Backend contract conformance tests in `backend/tests/contract/`: `test_openapi_parity.py` (FastAPI paths/methods/statuses vs `shared/contracts/api-spec.yaml`), `test_schemathesis.py` (fixture mode), `test_examples_validate.py` (each `shared/contracts/examples/*.json` parses into its pydantic model) | codex | P0-03 | §6, §14 | todo | | |
+| P0-10 | Frontend `npm run contract:check` script wrapping `scripts/validate_contracts.py` plus a `tsc` check that `types.ts` compiles under strict mode | antigravity | P0-04 | §14 | todo | | |
+| P0-08 | Copy `docs/05-capability-matrix-starter.md` → `docs/capability-matrix.md`; run SDK introspection script to confirm/deny each candidate method on the pinned SDK; fill `unknown` → confirmed names or `unsupported` | codex | P0-02 | §5 | todo | | |
+
+## Phase 1 — Discovery, metadata, grants, plan core
+
+| ID | Task | Owner | Depends on | Spec | Status | Started | Evidence |
+|---|---|---|---|---|---|---|---|
+| P1-01 | SDK adapters for catalogs/schemas/tables/volumes/functions/models (list+get, pagination, allowlisted DTO mappers) + contract tests | codex | P0-08 | §7.1 | todo | | |
+| P1-02 | Grants adapter (direct, effective with source, delta update) + privilege catalogue by securable type | codex | P0-08 | §7.2 | todo | | |
+| P1-03 | Principals adapter (SCIM search; workspace-local group flag; UC eligibility validation) | codex | P0-08 | §7.2 | todo | | |
+| P1-04 | Mutation core: plan builder, HMAC token, TTL, observed-state hash, executor, verifier, operation store Protocol (in-memory impl) | codex | P0-06 | §9 | todo | | |
+| P1-05 | Plan kinds: grant, revoke, transfer ownership, edit description/properties; prerequisite explanation; inherited-revoke refusal with `navigate_to` | codex | P1-02, P1-04 | §7.2, §11.4–11.5 | todo | | |
+| P1-06 | UI Data Assets: browse tree, debounced/cancellable search, breadcrumbs, asset overview, copy FQN, refresh, empty/visibility/error states | antigravity | P0-05 | §11.2 | todo | | |
+| P1-07 | UI Access tab: table with principal/type/privilege(label+code)/source badge/actions, filters, limitation line | antigravity | P0-05 | §11.4 | todo | | |
+| P1-08 | UI `PlanFlow`: form → preview → apply → in-page result; stale, expired, duplicate, unknown-outcome states; typed-name confirmation variant | antigravity | P1-05 | §9, §11.5–11.6 | todo | | |
+| P1-09 | API tests: authz per route, identity spoofing, plan lifecycle, degraded modes | codex | P1-05 | §14 | todo | | |
+| P1-10 | E2E: find table → read access → preview grant → apply → verify; revoke inherited → navigate to source; unknown outcome → reconcile | antigravity | P1-08 | §14 | todo | | |
+| P1-11 | Screenshots + `docs/browser-review.md` first pass (1440/375) | antigravity | P1-10 | §15 | todo | | |
+
+## Phase 2 — Tags, classification, ABAC, filters/masks
+
+| ID | Task | Owner | Depends on | Spec | Status | Started | Evidence |
+|---|---|---|---|---|---|---|---|
+| P2-01 | Tags: read/assign/remove via confirmed SDK surface or SQL templates; system-tag rejection; governed tags via tag-policies API if confirmed | codex | P0-08, P1-04 | §7.3 | todo | | |
+| P2-02 | Data Classification read integration if a documented surface exists; else matrix row `unsupported`/`not_implemented` with reason | codex | P0-08 | §7.3 | todo | | |
+| P2-03 | ABAC policies CRUD via confirmed mechanism; validation; impact preview labeled "not evaluated by Databricks" | codex | P0-08, P1-04 | §7.4 | todo | | |
+| P2-04 | Row filters / column masks: read from metadata; set/drop via SQL templates; function dependency lookup; exposure warning | codex | P1-04 | §7.5 | todo | | |
+| P2-05 | Dynamic views: read definition; replace via full-text plan with diff | codex | P2-04 | §7.5 | todo | | |
+| P2-06 | UI: Tags tab; Policies section (list/detail/edit via PlanFlow); Filters & masks panel; ownership transfer | antigravity | P2-01, P2-03, P2-04 | §11 | todo | | |
+| P2-07 | Tests: tag/policy/filter validation; SQL identifier fuzz; ABAC label assertions | either | P2-06 | §14 | todo | | |
+
+## Phase 3 — Storage, bindings, federation, sharing
+
+| ID | Task | Owner | Depends on | Spec | Status | Started | Evidence |
+|---|---|---|---|---|---|---|---|
+| P3-01 | Storage credentials, service credentials, external locations: read (allowlist), CUD plans, native validate, IAM-vs-UC copy | codex | P1-04 | §7.6 | todo | | |
+| P3-02 | Workspace bindings read + update plan with disruption preview (visible dependents / unknown) | codex | P1-04 | §7.6 | todo | | |
+| P3-03 | Connections & foreign catalogs; per-connector capability table; SSRF host validation | codex | P1-04 | §7.7 | todo | | |
+| P3-04 | Shares/recipients/providers; sharing-mode explanation; token operations policy-unsupported with admin alternative | codex | P1-04 | §7.8 | todo | | |
+| P3-05 | UI Platform area for P3-01..04 with typed-name confirmations | antigravity | P3-01..P3-04 | §11 | todo | | |
+| P3-06 | Tests: SSRF, secret allowlists, unbind preview, share validation | either | P3-05 | §14 | todo | | |
+
+## Phase 4 — Lineage, audit, findings, quality, AI assets
+
+| ID | Task | Owner | Depends on | Spec | Status | Started | Evidence |
+|---|---|---|---|---|---|---|---|
+| P4-01 | Lineage via system tables (bounded) and confirmed SDK surface if any; coverage/latency meta | codex | P0-08 | §7.9 | todo | | |
+| P4-02 | Databricks audit template + app activity store + correlation status | codex | P0-08 | §7.10 | todo | | |
+| P4-03 | Findings rules engine (signals only) | codex | P1-02 | §7.10 | todo | | |
+| P4-04 | Quality monitors read; create/refresh as plans with cost notice | codex | P1-04 | §7.11 | todo | | |
+| P4-05 | Models/versions/functions governance; serving endpoints as related service | codex | P1-01 | §7.11 | todo | | |
+| P4-06 | UI: Lineage graph (`@xyflow/react`), Activity with separated tabs, Findings, Quality tab, AI assets | antigravity | P4-01..P4-05 | §11 | todo | | |
+
+## Phase 5 — Requests, approvals, reviews, persistence, scheduler
+
+| ID | Task | Owner | Depends on | Spec | Status | Started | Evidence |
+|---|---|---|---|---|---|---|---|
+| P5-01 | Verify native RFA surface in pinned SDK; matrix row lists exactly which steps it covers | codex | P0-08 | §7.12 | todo | | |
+| P5-02 | Lakebase repository: `backend/app/persistence/migrations/0001_init.sql`, psycopg pool, OAuth credential refresh, explicit `migrate` command (never at startup) | codex | P1-04 | §10 | todo | | |
+| P5-03 | App-owned request → approval → apply; SoD; approver scope authority; status separation | codex | P5-02 | §7.12 | todo | | |
+| P5-04 | Access reviews with persisted scope/evidence/decisions/results | codex | P5-02 | §7.12 | todo | | |
+| P5-05 | Time-bound access: `jobs/expiry_reconciler/` source + job YAML (not deployed); overlap-preserving logic + tests | codex | P5-03 | §7.12, §10 | todo | | |
+| P5-06 | UI: Requests inbox, approval detail with authority explanation, reviews | antigravity | P5-03, P5-04 | §11 | todo | | |
+| P5-07 | Degraded behavior without Lakebase: features `not_configured` with next steps; tests | either | P5-06 | §10, §12 | todo | | |
+
+## Phase 6 — Hardening, review, deployment prep, handoff
+
+| ID | Task | Owner | Depends on | Spec | Status | Started | Evidence |
+|---|---|---|---|---|---|---|---|
+| P6-01 | Final `app.yaml`, `.env.example`, README commands, `docs/runbook.md` (setup, rotation, troubleshooting, reconciliation, recovery, limitations) | codex | all P5 | §15 | todo | | |
+| P6-02 | Browser review at 1440/1024/375, keyboard-only, reduced motion, 200 % zoom, long names; fix findings; `docs/browser-review.md` | antigravity | all P5 | §11.6, §14 | todo | | |
+| P6-03 | Accessibility audit (`web-design-guidelines` skill + axe); `docs/a11y-manual-checks.md` | antigravity | P6-02 | §11.6 | todo | | |
+| P6-04 | Full check run; outputs to `docs/test-results/`; capability matrix final pass | either | P6-01..P6-03 | §14 | todo | | |
+| P6-05 | `docs/handoff-report.md` per spec §16 | either | P6-04 | §16 | todo | | |

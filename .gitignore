@@ -1,0 +1,23 @@
+# Build and dependency output. None of this belongs in the deployed app bundle,
+# and `databricks sync` must never upload it.
+.venv/
+node_modules/
+frontend/dist/
+__pycache__/
+*.py[cod]
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.vite/
+coverage/
+playwright-report/
+test-results/
+
+# Orchestration transcripts. Run records are state, logs are noise.
+.ai/logs/
+
+# Local configuration. Never commit real credentials.
+.env
+.env.local

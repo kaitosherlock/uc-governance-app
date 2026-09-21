@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "data": {
+    "id": "a7e2c4d6-8b0f-4a1c-9d3e-5f7a9b1c3d5e",
+    "plan_id": "5f3c9a2e-1b7d-4e0a-9c11-2d6f8a0b1c22",
+    "kind": "grant",
+    "status": "unknown",
+    "identity": {
+      "actor": {
+        "id": "u-1001",
+        "display": "alice.steward@example.test",
+        "kind": "user",
+        "roles": ["steward", "access_admin"],
+        "verified_by": "fixture"
+      },
+      "executor": {
+        "kind": "service_principal",
+        "display": "uc-governance-app (sp-7f3a…)",
+        "reason": "The Unity Catalog grants API is not in the user-authorization scope set."
+      }
+    },
+    "started_at": "2026-09-21T09:06:02Z",
+    "finished_at": "2026-09-21T09:06:52Z",
+    "atomic": true,
+    "targets": [
+      {
+        "target": { "securable_type": "TABLE", "full_name": "sales.crm.orders", "kind": "table", "display_name": "orders" },
+        "status": "unknown",
+        "verified": false,
+        "verified_at": null,
+        "databricks_request_id": null,
+        "error": {
+          "code": "OUTCOME_UNKNOWN",
+          "message": "The request was sent but no response arrived within 50 seconds. The grant may or may not have been applied."
+        },
+        "summary": "Outcome unknown for SELECT to `marketing-analysts` on sales.crm.orders"
+      }
+    ],
+    "reconcile_available": true,
+    "summary": "Outcome unknown. Check current state before retrying.",
+    "correlation_id": "c0ffee00-0000-4000-8000-000000000005"
+  },
+  "meta": {
+    "source": "fixture",
+    "observed_at": "2026-09-21T09:06:52Z",
+    "scope": { "catalog": "sales", "schema": "crm" },
+    "completeness": "unknown",
+    "limitations": ["No read-back has been performed yet."],
+    "correlation_id": "c0ffee00-0000-4000-8000-000000000005"
+  }
+}

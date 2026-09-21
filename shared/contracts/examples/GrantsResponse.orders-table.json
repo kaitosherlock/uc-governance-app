@@ -1,0 +1,76 @@
+{
+  "success": true,
+  "data": {
+    "target": {
+      "securable_type": "TABLE",
+      "full_name": "sales.crm.orders",
+      "kind": "table",
+      "display_name": "orders"
+    },
+    "owner": "data-eng-owners",
+    "direct": [
+      {
+        "principal": "analysts",
+        "principal_kind": "group",
+        "privilege": "SELECT",
+        "source": { "type": "direct", "securable_type": "TABLE", "full_name": "sales.crm.orders" },
+        "allowed_actions": [
+          { "action": "revoke", "allowed": true }
+        ]
+      },
+      {
+        "principal": "svc-etl-nightly",
+        "principal_kind": "service_principal",
+        "privilege": "MODIFY",
+        "source": { "type": "direct", "securable_type": "TABLE", "full_name": "sales.crm.orders" },
+        "allowed_actions": [
+          { "action": "revoke", "allowed": true }
+        ]
+      }
+    ],
+    "inherited": [
+      {
+        "principal": "sales-readers",
+        "principal_kind": "group",
+        "privilege": "SELECT",
+        "source": { "type": "inherited", "securable_type": "SCHEMA", "full_name": "sales.crm" },
+        "allowed_actions": [
+          {
+            "action": "revoke",
+            "allowed": false,
+            "reason_code": "INHERITED_FROM_PARENT",
+            "reason": "This privilege is inherited from schema sales.crm. Revoke it at the source.",
+            "navigate_to": "/assets/sales/crm?tab=access"
+          }
+        ]
+      },
+      {
+        "principal": "account users",
+        "principal_kind": "group",
+        "privilege": "USE_CATALOG",
+        "source": { "type": "inherited", "securable_type": "CATALOG", "full_name": "sales" },
+        "allowed_actions": [
+          {
+            "action": "revoke",
+            "allowed": false,
+            "reason_code": "INHERITED_FROM_PARENT",
+            "reason": "This privilege is inherited from catalog sales. Revoke it at the source.",
+            "navigate_to": "/assets/sales?tab=access"
+          }
+        ]
+      }
+    ],
+    "group_membership_loaded": false
+  },
+  "meta": {
+    "source": "fixture",
+    "observed_at": "2026-09-21T09:01:12Z",
+    "scope": { "catalog": "sales", "schema": "crm" },
+    "completeness": "partial_visibility",
+    "limitations": [
+      "Showing grants visible to the application's service principal.",
+      "Group membership was not loaded; access through group membership is not shown."
+    ],
+    "correlation_id": "c0ffee00-0000-4000-8000-000000000003"
+  }
+}

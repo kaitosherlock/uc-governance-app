@@ -1,0 +1,111 @@
+uc-governance-app/                         ← SOURCE ROOT (spec's "governance-app/"; see README for the collision note)
+│
+│  ── Agent entry points ─────────────────────────────────────────────────────────────
+├── AGENTS.md                              Overview of the flow, hard rules, ownership, DoD (both coders)
+├── BACKEND_INSTRUCTION.md                 Backend Coder (Codex): stack, layering, principles, checklist, DoD
+├── FRONTEND_INSTRUCTION.md                Frontend Coder (Antigravity): stack, contract discipline, 4 UI states, PlanFlow, DoD
+├── GEMINI.md                              Pointer for Antigravity → AGENTS.md + FRONTEND_INSTRUCTION.md
+├── .agent/
+│   ├── rules/00-project-rules.md          Always-on rules (Antigravity)
+│   └── workflows/implement-task.md        /implement-task workflow (Antigravity)
+├── README.md                              Folder map, planned commands
+├── structure.txt                          This file
+│
+│  ── ORCHESTRATION (orchestrator-owned) ──────────────────────────────────────────
+├── .ai/
+│   ├── HANDOVER.md                        Continuous checkpoint: phase, milestones, blockers, next actions, agent config
+│   ├── agents.json                        Agent CLIs, status, command templates, model tiers (probed 2026-09-21)
+│   ├── prompts/                           One dispatch prompt per task, e.g. P0-03.md
+│   └── logs/                              Dispatch transcripts written by scripts/dispatch.ps1
+├── scripts/
+│   ├── validate_contracts.py              Gate 1 enforcement, 15 checks, no network
+│   ├── dispatch.ps1                       Dispatch wrapper: runs Gate 1, refuses non-READY agents, logs
+│   └── check_all.ps1 / check_all.sh       (created in P0-07) full local verification
+│
+│  ── LOCKED CONTRACT (shared, architect-owned) ────────────────────────────────────
+├── shared/
+│   └── contracts/
+│       ├── api-spec.yaml                  OpenAPI 3.0.3 — canonical paths, schemas, enums, error codes
+│       ├── types.ts                       TypeScript mirror + API_PATHS (frontend imports as @contracts/types)
+│       ├── error-codes.md                 Meaning / trigger / UI treatment per ErrorCode
+│       ├── README.md                      Invariants and change process
+│       └── examples/                      Payloads that validate against the spec; MSW + backend snapshot tests
+│           │                              Naming rule: <SchemaName>.<scenario>.json, SchemaName exact
+│           ├── ContextResponse.fixture.json
+│           ├── IdentityResponse.steward.json
+│           ├── AssetListResponse.list-schema-objects.json
+│           ├── GrantsResponse.orders-table.json
+│           ├── PlanResponse.grant-preview.json
+│           ├── OperationResponse.unknown-outcome.json
+│           ├── ErrorResponse.forbidden-role.json
+│           ├── ErrorResponse.validation-failed.json
+│           └── ErrorResponse.not-configured.json
+│
+│  ── BACKEND (Codex) ─────────────────────────────────────────────────────────────
+├── app.yaml                               Databricks Apps manifest (array command, env valueFrom)
+├── pyproject.toml / uv.lock / requirements.txt
+├── .env.example
+├── backend/
+│   ├── openapi.json                       Generated from FastAPI; parity-tested against shared/contracts/api-spec.yaml
+│   ├── app/
+│   │   ├── main.py                        create_app(): routers + static dist mount + middleware
+│   │   ├── config/                        Settings, UCGOV_MODE enum, Apps-env guard
+│   │   ├── auth/                          Actor resolution from user token; header cross-check; local strategy
+│   │   ├── authz/                         Roles, policy table, scope checks, Decision objects
+│   │   ├── capabilities/                  registry.py (implementation status) + probe.py (runtime availability)
+│   │   ├── adapters/
+│   │   │   ├── protocols.py               typing.Protocol per adapter
+│   │   │   ├── databricks/                ONLY place importing `databricks` SDK (catalogs.py, grants.py, …)
+│   │   │   ├── sql/                       Statement Execution + templates/*.sql + identifier validation
+│   │   │   └── fixtures/                  In-memory implementations of the same Protocols
+│   │   ├── domain/                        assets, grants, privileges, tags, policies, filters, storage,
+│   │   │                                  federation, sharing, lineage, activity, findings, quality, ai_assets, requests, admin
+│   │   ├── mutations/                     plan_builder.py, hmac.py, executor.py, verifier.py, state.py
+│   │   ├── persistence/                   ONLY place importing psycopg; repository.py; migrations/0001_init.sql
+│   │   ├── audit/                         Activity writer, redaction filter, correlation ids
+│   │   ├── api/                           v1 routers, pydantic models mirroring the contract, error handlers
+│   │   ├── fixtures_data/                 Synthetic dataset + scenarios.py
+│   │   └── tools/export_openapi.py
+│   └── tests/
+│       ├── unit/
+│       ├── contract/                      openapi parity, schemathesis, examples validate, sdk shapes
+│       ├── api/
+│       └── integration/                   opt-in (-m live), disabled here
+├── jobs/
+│   └── expiry_reconciler/                 Lakeflow job source + job.yaml (artifact only, never deployed)
+│
+│  ── FRONTEND (Antigravity) ──────────────────────────────────────────────────────
+├── frontend/
+│   ├── package.json / package-lock.json / vite.config.ts / tsconfig.json (paths: @contracts/* → ../shared/contracts/*)
+│   ├── src/
+│   │   ├── app/                           router, providers, layout shell, ContextBar
+│   │   ├── design/tokens.css              color/type/space/radius/focus/motion tokens (docs/07)
+│   │   ├── components/ui/                 shadcn-owned primitives
+│   │   ├── components/PlanFlow/           shared mutation flow (form → preview → confirm → result)
+│   │   ├── features/                      assets, access, tags, policies, filters, storage, federation,
+│   │   │                                  sharing, lineage, activity, quality, ai-assets, requests, admin
+│   │   ├── api/client.ts                  the only fetch; envelope parsing; ApiError
+│   │   ├── mocks/handlers.ts              MSW handlers from shared/contracts/examples
+│   │   └── lib/strings.ts                 all English UI text
+│   └── e2e/                               Playwright specs (+ axe)
+│
+│  ── DOCS & COORDINATION ─────────────────────────────────────────────────────────
+├── docs/
+│   ├── 00-spec.md                         PRD, verbatim, authoritative
+│   ├── 01-plan.md                         Phases 0–6, exit criteria
+│   ├── 02-architecture.md                 Modes, layout, contracts summary (defers to shared/contracts)
+│   ├── 03-technology-decision.md          Stack evidence (finalized in P0-02)
+│   ├── 04-databricks-apps-constraints.md  Verified platform facts (2026-09-21)
+│   ├── 05-capability-matrix-starter.md    Seed → docs/capability-matrix.md
+│   ├── 06-security-model.md               Auth, roles, execution identity, plan integrity
+│   ├── 07-design-brief.md                 Product brief, IA, flows, tokens, copy rules
+│   ├── 08-testing-and-acceptance.md       Test matrix → acceptance evidence
+│   ├── open-questions.md                  Unverified items awaiting user/agent answers
+│   ├── capability-matrix.md               (created P0-08)
+│   ├── runbook.md / browser-review.md / a11y-manual-checks.md / handoff-report.md   (created later)
+│   └── test-results/                      Pasted command outputs
+├── screenshots/                           synthetic-<screen>-<width>.png
+└── tasks/
+    ├── TASK-BOARD.md                      Claimable tasks with owner, deps, evidence
+    ├── STATUS.md                          Append-only coordination log
+    └── HANDOFF-PROTOCOL.md                Two agents, one folder, no Git

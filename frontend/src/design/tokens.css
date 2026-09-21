@@ -1,0 +1,193 @@
+/*
+ * tokens.css — Design token system for the UC Governance application.
+ *
+ * Implements docs/07-design-brief.md section 4.
+ * Tokens are defined as CSS custom properties on :root, then surfaced
+ * to Tailwind v4 via the @theme block so they work as utility classes.
+ *
+ * There is no dark theme in this task; light is primary.
+ */
+
+/* ---------------------------------------------------------------- tokens */
+:root {
+  color-scheme: light;
+
+  /* ---- Neutrals: 11-step warm grey scale ---- */
+  --color-neutral-0: #FBFAF8;   /* paper */
+  --color-neutral-1: #F5F3F0;
+  --color-neutral-2: #EDEBE7;
+  --color-neutral-3: #E2DFDB;
+  --color-neutral-4: #D1CDC8;
+  --color-neutral-5: #B8B3AD;
+  --color-neutral-6: #9A9590;
+  --color-neutral-7: #7A7570;
+  --color-neutral-8: #5C5854;
+  --color-neutral-9: #3D3A37;
+  --color-neutral-10: #1B1A17;  /* ink */
+
+  /*
+   * ---- Semantic colour tokens ----
+   * Do NOT use raw --color-neutral-* steps for text, icons, or structural
+   * borders. Use the semantic tokens below instead. They are computed to
+   * pass WCAG AA contrast against the paper background (#FBFAF8) and the
+   * panel background (#F5F3F0), so contrast cannot regress.
+   */
+  --color-text-primary:   #1B1A17;   /* 16.7:1 on paper */
+  --color-text-secondary: #5C5854;   /*  6.8:1 on paper */
+  --color-text-muted:     #6D6964;   /*  5.2:1 on paper, 4.9:1 on panel */
+  --color-icon-muted:     #6D6964;   /*  5.2:1, legible as an icon or as text */
+  --color-border-subtle:  #E2DFDB;   /* decorative hairlines only, never the sole boundary */
+  --color-border-strong:  #898784;   /*  3.4:1, for real structural and interactive boundaries */
+
+  /* ---- Accent: deep teal ---- */
+  --color-accent: #0F6E68;
+  --color-accent-hover: #0B5751;
+  --color-accent-light: #E6F2F1;
+
+  /* ---- Status colours ---- */
+  --color-success: #1E7B4E;
+  --color-warning: #9A6700;
+  --color-danger: #B42318;
+  --color-info: #3B5B7A;
+  --color-unknown: #5F5A70;
+
+  /* Status backgrounds (subtle) */
+  --color-success-bg: #EAFAF0;
+  --color-warning-bg: #FFF8E6;
+  --color-danger-bg: #FEF1F0;
+  --color-info-bg: #EFF4F8;
+  --color-unknown-bg: #F2F0F5;
+
+  /* ---- Mode colours ---- */
+  --color-mode-demo: #9A6700;
+  --color-mode-readonly: #3B5B7A;
+  --color-mode-editing: #0F6E68;
+
+  /* ---- Spacing: 4px base ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Radii ---- */
+  --radius-control: 4px;
+  --radius-panel: 6px;
+
+  /* ---- Elevation: exactly one level ---- */
+  --shadow-panel: 0 1px 3px 0 rgba(27, 26, 23, 0.08), 0 1px 2px -1px rgba(27, 26, 23, 0.08);
+
+  /* ---- Focus ring ---- */
+  --focus-ring-color: #0F6E68;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring: var(--focus-ring-width) solid var(--focus-ring-color);
+
+  /* ---- Motion ---- */
+  --duration-fast: 120ms;
+  --duration-normal: 160ms;
+
+  /*
+   * ---- Typography ----
+   * Font stacks are intentionally system-resident because the app must work
+   * without external font requests (restricted enterprise networks). The
+   * monospace face is reserved for identifiers such as fully qualified names
+   * and privilege codes.
+   */
+  --font-ui:   ui-sans-serif, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+
+  --leading-normal: 1.5;
+  --leading-snug: 1.4;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+}
+
+/* ---- Reduced motion: zero durations and disable transitions ---- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------- Tailwind v4 @theme */
+@theme {
+  /* Neutrals */
+  --color-neutral-0: #FBFAF8;
+  --color-neutral-1: #F5F3F0;
+  --color-neutral-2: #EDEBE7;
+  --color-neutral-3: #E2DFDB;
+  --color-neutral-4: #D1CDC8;
+  --color-neutral-5: #B8B3AD;
+  --color-neutral-6: #9A9590;
+  --color-neutral-7: #7A7570;
+  --color-neutral-8: #5C5854;
+  --color-neutral-9: #3D3A37;
+  --color-neutral-10: #1B1A17;
+
+  /* Semantic colours */
+  --color-text-primary: #1B1A17;
+  --color-text-secondary: #5C5854;
+  --color-text-muted: #6D6964;
+  --color-icon-muted: #6D6964;
+  --color-border-subtle: #E2DFDB;
+  --color-border-strong: #898784;
+
+  /* Accent */
+  --color-accent: #0F6E68;
+  --color-accent-hover: #0B5751;
+  --color-accent-light: #E6F2F1;
+
+  /* Status */
+  --color-success: #1E7B4E;
+  --color-warning: #9A6700;
+  --color-danger: #B42318;
+  --color-info: #3B5B7A;
+  --color-unknown: #5F5A70;
+
+  --color-success-bg: #EAFAF0;
+  --color-warning-bg: #FFF8E6;
+  --color-danger-bg: #FEF1F0;
+  --color-info-bg: #EFF4F8;
+  --color-unknown-bg: #F2F0F5;
+
+  /* Mode */
+  --color-mode-demo: #9A6700;
+  --color-mode-readonly: #3B5B7A;
+  --color-mode-editing: #0F6E68;
+
+  /* Font families */
+  --font-ui: ui-sans-serif, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Radii */
+  --radius-control: 4px;
+  --radius-panel: 6px;
+
+  /* Shadows */
+  --shadow-panel: 0 1px 3px 0 rgba(27, 26, 23, 0.08), 0 1px 2px -1px rgba(27, 26, 23, 0.08);
+}

@@ -1,0 +1,37 @@
+@import "tailwindcss";
+@import "./design/tokens.css";
+
+/*
+ * index.css — Global stylesheet.
+ * Imports Tailwind and the design tokens. Sets base background and text
+ * colour from the token system. No decorative global styles.
+ */
+
+body {
+  background-color: var(--color-neutral-0);
+  color: var(--color-neutral-10);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * Global focus-visible ring using the design token.
+ * Applied to all interactive elements for keyboard accessibility.
+ */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Monospace elements use tabular numerals */
+code,
+kbd,
+samp,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

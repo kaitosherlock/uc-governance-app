@@ -1,0 +1,9 @@
+{
+  "success": false,
+  "code": "NOT_CONFIGURED",
+  "message": "Lineage requires a SQL warehouse, and none is configured for this application.",
+  "correlation_id": "c0ffee00-0000-4000-8000-000000000008",
+  "next_steps": [
+    "Ask a Platform Administrator to add a SQL warehouse resource (permission: Can use) to the app and set UCGOV_WAREHOUSE_ID."
+  ]
+}

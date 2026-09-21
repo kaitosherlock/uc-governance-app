@@ -1,0 +1,2540 @@
+openapi: 3.0.3
+info:
+  title: Unity Catalog Governance API
+  version: 1.0.0
+  license:
+    name: Proprietary - internal use only
+  description: |
+    LOCKED CONTRACT between Backend Coder and Frontend Coder.
+
+    Rules
+    - This file is the single source of truth for every HTTP path, payload, enum, and error code.
+    - Every success response is `{ success: true, data, meta, page? }`.
+    - Every error response is `{ success: false, code, message, correlation_id, next_steps?, errors? }`
+      and is never sent with HTTP 200.
+    - Ambiguous mutation outcome after submission is HTTP 202 with an Operation whose status is `unknown`.
+    - Field names are snake_case. Timestamps are ISO 8601 UTC strings (`2026-09-21T09:12:33Z`).
+    - Nullable fields are explicit (`nullable: true`). Absent optional fields mean "not provided", not null.
+    - Object names, principal names, and privilege identifiers are passed through verbatim.
+    - Changes to this file follow shared/contracts/README.md (additive by default, version bump on breaking).
+servers:
+  - url: /api/v1
+security:
+  - databricksAppsUser: []
+tags:
+  - name: context
+    description: Workspace, environment, mode, identity, and capability discovery.
+  - name: assets
+    description: Unity Catalog object discovery and metadata.
+  - name: principals
+    description: Users, account groups, and service principals.
+  - name: grants
+    description: Direct and inherited privileges, and the privilege catalogue.
+  - name: tags
+    description: Free-form tags, governed tags, and tag policies.
+  - name: plans
+    description: The mutation lifecycle - preview, execute, verify, reconcile.
+  - name: policies
+    description: ABAC policies and their potential impact.
+  - name: filters
+    description: Row filters, column masks, and the functions behind them.
+  - name: storage
+    description: Storage credentials, external locations, and workspace bindings.
+  - name: federation
+    description: Connections and foreign catalogs.
+  - name: sharing
+    description: Delta Sharing shares, recipients, and providers.
+  - name: lineage
+    description: Bounded upstream and downstream lineage for impact analysis.
+  - name: activity
+    description: Databricks audit records, application activity, and review findings.
+  - name: quality
+    description: Data quality monitors and refresh history.
+  - name: ai-assets
+    description: Registered models, versions, and related serving endpoints.
+  - name: requests
+    description: Application-owned access requests, approvals, and reviews.
+  - name: admin
+    description: Platform administration through the Account API.
+
+paths:
+  # ------------------------------------------------------------------ context
+  /context:
+    get:
+      tags: [context]
+      operationId: getContext
+      summary: Workspace, environment, mode, and configured resources
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /me:
+    get:
+      tags: [context]
+      operationId: getMe
+      summary: Authenticated actor and default execution identity
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /capabilities:
+    get:
+      tags: [context]
+      operationId: listCapabilities
+      summary: Implementation coverage and runtime availability of every capability
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilitiesResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  # ------------------------------------------------------------------ assets
+  /catalogs:
+    get:
+      tags: [assets]
+      operationId: listCatalogs
+      summary: List catalogs visible to the executing identity
+      parameters:
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /catalogs/{catalog}/schemas:
+    get:
+      tags: [assets]
+      operationId: listSchemas
+      summary: List schemas in a catalog
+      parameters:
+        - $ref: '#/components/parameters/Catalog'
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /schemas/{catalog}/{schema}/objects:
+    get:
+      tags: [assets]
+      operationId: listSchemaObjects
+      summary: Tables, views, volumes, functions, and models inside one schema
+      parameters:
+        - $ref: '#/components/parameters/Catalog'
+        - $ref: '#/components/parameters/Schema'
+        - name: kind
+          in: query
+          description: Repeatable filter on object kind
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/ObjectKind' }
+          style: form
+          explode: true
+        - name: owner
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /assets/{securable_type}/{full_name}:
+    get:
+      tags: [assets]
+      operationId: getAsset
+      summary: Get one asset with its metadata, tags, and columns
+      parameters:
+        - $ref: '#/components/parameters/SecurableType'
+        - $ref: '#/components/parameters/FullName'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetailResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /assets/{securable_type}/{full_name}/dependencies:
+    get:
+      tags: [assets]
+      operationId: getAssetDependencies
+      summary: Known dependents before a destructive change. Missing data is not proof of safety.
+      parameters:
+        - $ref: '#/components/parameters/SecurableType'
+        - $ref: '#/components/parameters/FullName'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DependenciesResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ principals
+  /principals/search:
+    get:
+      tags: [principals]
+      operationId: searchPrincipals
+      summary: Search users, groups, and service principals
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 200 }
+        - name: kind
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/PrincipalKind' }
+          style: form
+          explode: true
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrincipalListResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ grants
+  /privileges:
+    get:
+      tags: [grants]
+      operationId: listPrivileges
+      summary: Privilege catalogue for a securable type
+      parameters:
+        - name: securable_type
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/SecurableType' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivilegeListResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /assets/{securable_type}/{full_name}/grants:
+    get:
+      tags: [grants]
+      operationId: getGrants
+      summary: Direct and inherited grants with their source
+      parameters:
+        - $ref: '#/components/parameters/SecurableType'
+        - $ref: '#/components/parameters/FullName'
+        - name: principal
+          in: query
+          schema: { type: string }
+        - name: privilege
+          in: query
+          schema: { type: string }
+        - name: source
+          in: query
+          schema: { $ref: '#/components/schemas/GrantSourceType' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrantsResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ tags
+  /assets/{securable_type}/{full_name}/tags:
+    get:
+      tags: [tags]
+      operationId: getTags
+      summary: Get object-level and column-level tags
+      parameters:
+        - $ref: '#/components/parameters/SecurableType'
+        - $ref: '#/components/parameters/FullName'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagsResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /tag-policies:
+    get:
+      tags: [tags]
+      operationId: listTagPolicies
+      summary: Governed tags with allowed values
+      parameters:
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagPolicyListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ plans (all privileged writes)
+  /plans:
+    post:
+      tags: [plans]
+      operationId: createPlan
+      summary: Validate, authorize, and build a read-only preview plan. Changes nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanCreateRequest'
+      responses:
+        '201':
+          description: Plan created (status `previewed`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /plans/{plan_id}:
+    get:
+      tags: [plans]
+      operationId: getPlan
+      summary: Get a previously created plan
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /plans/{plan_id}/execute:
+    post:
+      tags: [plans]
+      operationId: executePlan
+      summary: Revalidate, re-authorize, execute, verify by read-back, audit
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanExecuteRequest'
+      responses:
+        '200':
+          description: Operation finished with status applied, partially_applied, or failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '202':
+          description: Submitted but outcome unknown (timeout after send). Operation status is `unknown`. Call reconcile before retrying.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/PlanConflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /operations/{operation_id}:
+    get:
+      tags: [plans]
+      operationId: getOperation
+      summary: Get an operation and its per-target outcomes
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /operations/{operation_id}/reconcile:
+    post:
+      tags: [plans]
+      operationId: reconcileOperation
+      summary: Read back current state to resolve an unknown outcome. Never re-sends the mutation.
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ policies
+  /abac-policies:
+    get:
+      tags: [policies]
+      operationId: listAbacPolicies
+      summary: List ABAC policies
+      parameters:
+        - name: scope_full_name
+          in: query
+          description: Restrict to policies whose scope is this securable or its parents
+          schema: { type: string }
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbacPolicyListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /abac-policies/{policy_id}:
+    get:
+      tags: [policies]
+      operationId: getAbacPolicy
+      summary: Get one ABAC policy
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbacPolicyResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+  /abac-policies/{policy_id}/impact:
+    get:
+      tags: [policies]
+      operationId: previewAbacPolicyImpact
+      summary: Assets in the caller's visible scope that carry matching tags. Not a Databricks policy evaluation.
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyImpactResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ------------------------------------------------------------------ filters / masks / functions
+  /assets/TABLE/{full_name}/row-access:
+    get:
+      tags: [filters]
+      operationId: getRowAccessControls
+      summary: Row filter and column masks attached to a table, with attachment source
+      parameters:
+        - $ref: '#/components/parameters/FullName'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RowAccessResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /functions/{full_name}:
+    get:
+      tags: [filters]
+      operationId: getFunction
+      summary: Get a function with its signature and dependents
+      parameters:
+        - $ref: '#/components/parameters/FullName'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FunctionDetailResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ storage
+  /storage-credentials:
+    get:
+      tags: [storage]
+      operationId: listStorageCredentials
+      summary: List storage credentials (no secret material)
+      parameters:
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK. Secret material is never included.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageCredentialListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /external-locations:
+    get:
+      tags: [storage]
+      operationId: listExternalLocations
+      summary: List external locations
+      parameters:
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalLocationListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /bindings/{securable_type}/{full_name}:
+    get:
+      tags: [storage]
+      operationId: getWorkspaceBindings
+      summary: Get workspace bindings for a securable
+      parameters:
+        - $ref: '#/components/parameters/SecurableType'
+        - $ref: '#/components/parameters/FullName'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceBindingResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ federation
+  /connections:
+    get:
+      tags: [federation]
+      operationId: listConnections
+      summary: List federation connections (credentials stripped)
+      parameters:
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK. Options that may hold credentials are stripped.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ sharing
+  /shares:
+    get:
+      tags: [sharing]
+      operationId: listShares
+      summary: List Delta Sharing shares
+      parameters:
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /recipients:
+    get:
+      tags: [sharing]
+      operationId: listRecipients
+      summary: List share recipients (no tokens)
+      parameters:
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK. Tokens and activation links are never returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipientListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ lineage
+  /lineage/TABLE/{full_name}:
+    get:
+      tags: [lineage]
+      operationId: getTableLineage
+      summary: Get bounded table lineage from system tables
+      parameters:
+        - $ref: '#/components/parameters/FullName'
+        - name: direction
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/LineageDirection' }
+        - name: depth
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 5, default: 2 }
+        - name: max_nodes
+          in: query
+          schema: { type: integer, minimum: 10, maximum: 500, default: 100 }
+        - name: window_days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 90, default: 30 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineageResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ activity
+  /activity/app:
+    get:
+      tags: [activity]
+      operationId: listAppActivity
+      summary: Application-owned activity history (durable store). Not Databricks audit.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: actor
+          in: query
+          schema: { type: string }
+        - name: target_full_name
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppActivityListResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /activity/databricks-audit:
+    get:
+      tags: [activity]
+      operationId: listDatabricksAudit
+      summary: Bounded query over system.access.audit. Requires a SQL warehouse.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: actor
+          in: query
+          schema: { type: string }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: target_full_name
+          in: query
+          schema: { type: string }
+        - name: outcome
+          in: query
+          schema: { $ref: '#/components/schemas/AuditOutcome' }
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventListResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /findings:
+    get:
+      tags: [activity]
+      operationId: listFindings
+      summary: Governance review signals. Never automatic violations, never auto-remediated.
+      parameters:
+        - name: rule
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/FindingRule' }
+          style: form
+          explode: true
+        - name: catalog
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ------------------------------------------------------------------ quality
+  /quality/monitors/{full_name}:
+    get:
+      tags: [quality]
+      operationId: getQualityMonitor
+      summary: Get a data quality monitor and its refresh history
+      parameters:
+        - $ref: '#/components/parameters/FullName'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityMonitorResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ ai assets
+  /models/{full_name}/versions:
+    get:
+      tags: [ai-assets]
+      operationId: listModelVersions
+      summary: List versions of a registered model
+      parameters:
+        - $ref: '#/components/parameters/FullName'
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelVersionListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /serving-endpoints:
+    get:
+      tags: [ai-assets]
+      operationId: listServingEndpoints
+      summary: Related Databricks service. Endpoint permissions are not Unity Catalog grants.
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServingEndpointListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ access requests (application-owned)
+  /access-requests:
+    get:
+      tags: [requests]
+      operationId: listAccessRequests
+      summary: List access requests visible to the caller
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/AccessRequestStatus' }
+          style: form
+          explode: true
+        - name: role
+          in: query
+          description: Filter to requests where the caller is requester or approver
+          schema: { type: string, enum: [requester, approver] }
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+    post:
+      tags: [requests]
+      operationId: createAccessRequest
+      summary: Submit an access request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessRequestCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+  /access-requests/{request_id}:
+    get:
+      tags: [requests]
+      operationId: getAccessRequest
+      summary: Get one access request
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /access-requests/{request_id}/decision:
+    post:
+      tags: [requests]
+      operationId: decideAccessRequest
+      summary: Approve or reject. Approval creates a plan; applying is a separate, tracked operation.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessDecision'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessRequestResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/PlanConflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+  # ------------------------------------------------------------------ admin (Account API, separate client)
+  /admin/metastores:
+    get:
+      tags: [admin]
+      operationId: listMetastores
+      summary: List metastores (Account API)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetastoreListResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '503': { $ref: '#/components/responses/UpstreamUnavailable' }
+
+components:
+  securitySchemes:
+    databricksAppsUser:
+      type: apiKey
+      in: header
+      name: x-forwarded-access-token
+      description: |
+        Supplied by the Databricks Apps platform, not by the browser. The backend verifies the
+        actor by calling current_user.me() with this token and cross-checks the forwarded
+        identity headers. Clients never set this header themselves. In local fixture mode the
+        actor comes from UCGOV_FIXTURE_ACTOR and this scheme is not used.
+  # ================================================================== parameters
+  parameters:
+    PageToken:
+      name: page_token
+      in: query
+      schema: { type: string }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Query:
+      name: q
+      in: query
+      description: Case-insensitive substring match on name only, within the requested scope
+      schema: { type: string, maxLength: 200 }
+    Catalog:
+      name: catalog
+      in: path
+      required: true
+      schema: { type: string }
+    Schema:
+      name: schema
+      in: path
+      required: true
+      schema: { type: string }
+    SecurableType:
+      name: securable_type
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/SecurableType' }
+    FullName:
+      name: full_name
+      in: path
+      required: true
+      description: Fully qualified name, dot-separated, URL-encoded as one segment
+      schema: { type: string }
+    PlanId:
+      name: plan_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OperationId:
+      name: operation_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RequestId:
+      name: request_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    From:
+      name: from
+      in: query
+      required: true
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      required: true
+      description: Window must be at most 31 days
+      schema: { type: string, format: date-time }
+
+  # ================================================================== responses
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: No verifiable actor identity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: Role, scope, mode, or underlying privilege denies the action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Object not found or not visible to the executing identity (indistinguishable by design)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PlanConflict:
+      description: PLAN_STALE, PLAN_EXPIRED, PLAN_TAMPERED, PLAN_INVALIDATED, or DUPLICATE_SUBMISSION
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Upstream rate limit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InternalError:
+      description: Unexpected failure; message is safe and generic
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotImplemented:
+      description: Capability not implemented in this build
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UpstreamUnavailable:
+      description: Databricks API, warehouse, or durable store unavailable or not configured
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  # ================================================================== schemas
+  schemas:
+    # ---------------------------------------------------------------- envelope
+    ErrorCode:
+      type: string
+      description: Stable machine-readable codes. HTTP status in parentheses.
+      enum:
+        - VALIDATION_FAILED        # 400
+        - UNAUTHENTICATED          # 401
+        - IDENTITY_MISMATCH        # 401
+        - FORBIDDEN_ROLE           # 403
+        - FORBIDDEN_SCOPE          # 403
+        - MODE_READ_ONLY           # 403
+        - INSUFFICIENT_PRIVILEGES  # 403 (execution identity lacks UC privilege)
+        - SOD_VIOLATION            # 403
+        - NOT_FOUND                # 404
+        - PLAN_STALE               # 409
+        - PLAN_EXPIRED             # 409
+        - PLAN_TAMPERED            # 409
+        - PLAN_INVALIDATED         # 409
+        - DUPLICATE_SUBMISSION     # 409
+        - RATE_LIMITED             # 429
+        - INTERNAL_ERROR           # 500
+        - NOT_IMPLEMENTED          # 501
+        - UNSUPPORTED              # 501 (no documented supported mechanism)
+        - NOT_CONFIGURED           # 503 (warehouse, durable store, account client missing)
+        - UPSTREAM_UNAVAILABLE     # 503
+        - OUTCOME_UNKNOWN          # used inside Operation, never as HTTP error
+    FieldError:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string, description: "JSON pointer-ish path, e.g. changes.principal" }
+        code: { type: string }
+        message: { type: string }
+    ErrorResponse:
+      type: object
+      required: [success, code, message, correlation_id]
+      properties:
+        success: { type: boolean, enum: [false] }
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string, description: "Safe English sentence. Never raw SDK text, never secrets." }
+        correlation_id: { type: string }
+        next_steps:
+          type: array
+          items: { type: string }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
+    DataSource:
+      type: string
+      enum: [unity_catalog_api, account_api, system_table, durable_store, application, fixture]
+    Completeness:
+      type: string
+      enum: [complete, truncated, partial_visibility, unknown]
+    Meta:
+      type: object
+      required: [source, observed_at, completeness, limitations, correlation_id]
+      properties:
+        source: { $ref: '#/components/schemas/DataSource' }
+        observed_at: { type: string, format: date-time }
+        scope:
+          type: object
+          nullable: true
+          properties:
+            catalog: { type: string, nullable: true }
+            schema: { type: string, nullable: true }
+        completeness: { $ref: '#/components/schemas/Completeness' }
+        limitations:
+          type: array
+          items: { type: string }
+          description: Plain-English statements shown under tables, e.g. group membership not loaded
+        correlation_id: { type: string }
+    Page:
+      type: object
+      required: [page_size, next_page_token]
+      properties:
+        page_size: { type: integer }
+        next_page_token: { type: string, nullable: true }
+
+    # ---------------------------------------------------------------- context & identity
+    AppMode:
+      type: string
+      enum: [fixture, connected_readonly, connected]
+    Context:
+      type: object
+      required: [mode, mode_label, environment_label, workspace_host, workspace_id, managed_catalogs,
+                 support_contact, bootstrap_allowlist_active, warehouse_configured,
+                 durable_store_configured, account_client_configured]
+      properties:
+        mode: { $ref: '#/components/schemas/AppMode' }
+        mode_label:
+          type: string
+          description: Exact banner text
+          enum: ["Demo — synthetic data", "Read-only", "Editing enabled"]
+        environment_label: { type: string, description: "Configured, never inferred (e.g. DEV, UAT, PROD)" }
+        workspace_host: { type: string }
+        workspace_id: { type: string, nullable: true }
+        managed_catalogs:
+          type: array
+          items: { type: string }
+          description: Empty means all visible catalogs
+        support_contact: { type: string, nullable: true }
+        bootstrap_allowlist_active: { type: boolean }
+        warehouse_configured: { type: boolean }
+        durable_store_configured: { type: boolean }
+        account_client_configured: { type: boolean }
+    ContextResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/Context' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AppRole:
+      type: string
+      enum: [viewer, steward, access_admin, auditor, platform_admin]
+    ActorKind:
+      type: string
+      enum: [user, service_principal]
+    Actor:
+      type: object
+      required: [id, display, kind, roles, verified_by]
+      properties:
+        id: { type: string }
+        display: { type: string }
+        kind: { $ref: '#/components/schemas/ActorKind' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/AppRole' }
+        verified_by:
+          type: string
+          enum: [user_token, cli_profile, fixture]
+    Executor:
+      type: object
+      required: [kind, display, reason]
+      properties:
+        kind: { type: string, enum: [service_principal, user, account_service_principal] }
+        display: { type: string }
+        reason: { type: string, description: "Why this identity executes, in plain English" }
+    Identity:
+      type: object
+      required: [actor, executor]
+      properties:
+        actor: { $ref: '#/components/schemas/Actor' }
+        executor: { $ref: '#/components/schemas/Executor' }
+    IdentityResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/Identity' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    CapabilityStatusValue:
+      type: string
+      enum: [available, not_configured, insufficient_permissions, unsupported_in_environment,
+             not_implemented, temporarily_unavailable, unknown]
+    Capability:
+      type: object
+      required: [capability, domain, status, reason, requires, checked_at]
+      properties:
+        capability: { type: string, description: "Dotted id, e.g. grants.update" }
+        domain: { type: string, description: "Spec section id, e.g. \"7.2\"" }
+        status: { $ref: '#/components/schemas/CapabilityStatusValue' }
+        reason: { type: string, nullable: true }
+        requires:
+          type: array
+          items: { type: string, enum: [sql_warehouse, durable_store, account_client, user_token_scope] }
+        checked_at: { type: string, format: date-time }
+    CapabilitiesResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Capability' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- assets
+    SecurableType:
+      type: string
+      description: Unity Catalog securable types as used by the grants API
+      enum: [METASTORE, CATALOG, SCHEMA, TABLE, VOLUME, FUNCTION, REGISTERED_MODEL,
+             STORAGE_CREDENTIAL, CREDENTIAL, EXTERNAL_LOCATION, CONNECTION, SHARE, RECIPIENT, PROVIDER]
+    ObjectKind:
+      type: string
+      description: Display kind. TABLE securables split into table/view/materialized_view/streaming_table.
+      enum: [metastore, catalog, schema, table, view, materialized_view, streaming_table, volume,
+             function, registered_model, model_version]
+    ManagedStatus:
+      type: string
+      enum: [managed, external, not_applicable, unknown]
+    ActionName:
+      type: string
+      enum: [grant, revoke, transfer_ownership, edit_metadata, delete, assign_tag, remove_tag,
+             set_row_filter, drop_row_filter, set_column_mask, drop_column_mask,
+             replace_view_definition, update_binding, validate, create_quality_monitor,
+             refresh_quality_monitor, request_access]
+    AllowedAction:
+      type: object
+      required: [action, allowed]
+      properties:
+        action: { $ref: '#/components/schemas/ActionName' }
+        allowed: { type: boolean }
+        reason_code:
+          type: string
+          nullable: true
+          enum: [INHERITED_FROM_PARENT, ROLE_INSUFFICIENT, MODE_READ_ONLY, NOT_IMPLEMENTED,
+                 NOT_CONFIGURED, UNSUPPORTED_FOR_TYPE, PIPELINE_MANAGED, SYSTEM_TAG, OUT_OF_SCOPE,
+                 INSUFFICIENT_PRIVILEGES, UNKNOWN, null]
+        reason: { type: string, nullable: true }
+        navigate_to: { type: string, nullable: true, description: Frontend route to the source object }
+    AssetRef:
+      type: object
+      required: [securable_type, full_name, kind, display_name]
+      properties:
+        securable_type: { $ref: '#/components/schemas/SecurableType' }
+        full_name: { type: string, description: Verbatim fully qualified name }
+        kind: { $ref: '#/components/schemas/ObjectKind' }
+        display_name: { type: string, description: "Last path segment, verbatim" }
+    AssetSummary:
+      allOf:
+        - $ref: '#/components/schemas/AssetRef'
+        - type: object
+          required: [owner, comment, updated_at, managed, pipeline_managed, allowed_actions]
+          properties:
+            owner: { type: string, nullable: true }
+            comment: { type: string, nullable: true, description: "User-authored description, verbatim" }
+            updated_at: { type: string, format: date-time, nullable: true }
+            managed: { $ref: '#/components/schemas/ManagedStatus' }
+            pipeline_managed: { type: boolean, nullable: true }
+            allowed_actions:
+              type: array
+              items: { $ref: '#/components/schemas/AllowedAction' }
+    AssetListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AssetSummary' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    TagKind:
+      type: string
+      enum: [free_form, governed, system]
+    Tag:
+      type: object
+      required: [key, value, kind, allowed_actions]
+      properties:
+        key: { type: string }
+        value: { type: string, nullable: true }
+        kind: { $ref: '#/components/schemas/TagKind' }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    AttachmentSource:
+      type: string
+      enum: [direct, abac_policy, unknown]
+    RowFilterRef:
+      type: object
+      required: [function_full_name, input_columns, attached_via]
+      properties:
+        function_full_name: { type: string }
+        input_columns:
+          type: array
+          items: { type: string }
+        attached_via: { $ref: '#/components/schemas/AttachmentSource' }
+        policy_id: { type: string, nullable: true }
+    ColumnMaskRef:
+      type: object
+      required: [column, function_full_name, using_columns, attached_via]
+      properties:
+        column: { type: string }
+        function_full_name: { type: string }
+        using_columns:
+          type: array
+          items: { type: string }
+        attached_via: { $ref: '#/components/schemas/AttachmentSource' }
+        policy_id: { type: string, nullable: true }
+    Column:
+      type: object
+      required: [name, type_text, nullable, comment, position, tags, mask]
+      properties:
+        name: { type: string }
+        type_text: { type: string }
+        nullable: { type: boolean, nullable: true }
+        comment: { type: string, nullable: true }
+        position: { type: integer }
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/Tag' }
+        mask:
+          nullable: true
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/ColumnMaskRef'
+    AssetDetail:
+      allOf:
+        - $ref: '#/components/schemas/AssetSummary'
+        - type: object
+          required: [properties, tags, columns, row_filter, view_definition, storage_location,
+                     table_type, data_source_format, created_at, created_by, parent, raw]
+          properties:
+            properties:
+              type: object
+              additionalProperties: { type: string }
+            tags:
+              type: array
+              items: { $ref: '#/components/schemas/Tag' }
+            columns:
+              type: array
+              items: { $ref: '#/components/schemas/Column' }
+              description: Empty for non-tabular objects
+            row_filter:
+              nullable: true
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/RowFilterRef'
+            view_definition: { type: string, nullable: true }
+            storage_location: { type: string, nullable: true }
+            table_type: { type: string, nullable: true, description: Raw Databricks table_type string }
+            data_source_format: { type: string, nullable: true }
+            created_at: { type: string, format: date-time, nullable: true }
+            created_by: { type: string, nullable: true }
+            parent:
+              nullable: true
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/AssetRef'
+            raw:
+              type: object
+              description: Allowlisted, secret-free subset of the upstream object for the "Details" expander
+              additionalProperties: true
+    AssetDetailResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/AssetDetail' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    DependencyKind:
+      type: string
+      enum: [view, materialized_view, streaming_table, downstream_table, foreign_catalog, share,
+             policy_function, quality_monitor, model_version, unknown]
+    Dependency:
+      type: object
+      required: [kind, full_name, source, verified]
+      properties:
+        kind: { $ref: '#/components/schemas/DependencyKind' }
+        full_name: { type: string }
+        source: { $ref: '#/components/schemas/DataSource' }
+        verified: { type: boolean }
+    DependenciesResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [known, disclaimer]
+          properties:
+            known:
+              type: array
+              items: { $ref: '#/components/schemas/Dependency' }
+            disclaimer:
+              type: string
+              description: Always present; e.g. "Missing dependency information is not proof that deletion is safe."
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- principals
+    PrincipalKind:
+      type: string
+      enum: [user, group, service_principal]
+    PrincipalScope:
+      type: string
+      enum: [account, workspace_local, unknown]
+    Principal:
+      type: object
+      required: [name, display, kind, scope, uc_eligible, id]
+      properties:
+        name: { type: string, description: "Exact grantable identifier (email, group name, application id)" }
+        display: { type: string }
+        kind: { $ref: '#/components/schemas/PrincipalKind' }
+        scope: { $ref: '#/components/schemas/PrincipalScope' }
+        uc_eligible: { type: boolean, description: false for workspace-local groups }
+        id: { type: string, nullable: true }
+    PrincipalListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Principal' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+
+    # ---------------------------------------------------------------- grants
+    PrivilegeCategory:
+      type: string
+      enum: [browse, use, read, write, create, manage, all, object_specific]
+    Privilege:
+      type: object
+      required: [code, label, description, category, securable_types, prerequisites]
+      properties:
+        code: { type: string, description: "Exact Databricks identifier, e.g. SELECT" }
+        label: { type: string, description: "Plain-English label, e.g. \"Read data\"" }
+        description: { type: string }
+        category: { $ref: '#/components/schemas/PrivilegeCategory' }
+        securable_types:
+          type: array
+          items: { $ref: '#/components/schemas/SecurableType' }
+        prerequisites:
+          type: array
+          items: { type: string }
+          description: Privilege codes commonly required on parents, e.g. [USE_CATALOG, USE_SCHEMA]
+    PrivilegeListResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Privilege' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    GrantSourceType:
+      type: string
+      enum: [direct, inherited, unknown]
+    GrantSource:
+      type: object
+      required: [type, securable_type, full_name]
+      properties:
+        type: { $ref: '#/components/schemas/GrantSourceType' }
+        securable_type:
+          nullable: true
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/SecurableType'
+        full_name: { type: string, nullable: true, description: Where the grant lives when inherited }
+    Grant:
+      type: object
+      required: [principal, principal_kind, privilege, source, allowed_actions]
+      properties:
+        principal: { type: string }
+        principal_kind:
+          nullable: true
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/PrincipalKind'
+        privilege: { type: string, description: Exact code }
+        source: { $ref: '#/components/schemas/GrantSource' }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    GrantsData:
+      type: object
+      required: [target, owner, direct, inherited, group_membership_loaded]
+      properties:
+        target: { $ref: '#/components/schemas/AssetRef' }
+        owner: { type: string, nullable: true }
+        direct:
+          type: array
+          items: { $ref: '#/components/schemas/Grant' }
+        inherited:
+          type: array
+          items: { $ref: '#/components/schemas/Grant' }
+        group_membership_loaded: { type: boolean }
+    GrantsResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/GrantsData' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- tags
+    TagsResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [target, tags, column_tags]
+          properties:
+            target: { $ref: '#/components/schemas/AssetRef' }
+            tags:
+              type: array
+              items: { $ref: '#/components/schemas/Tag' }
+            column_tags:
+              type: object
+              additionalProperties:
+                type: array
+                items: { $ref: '#/components/schemas/Tag' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TagPolicy:
+      type: object
+      required: [key, description, allowed_values, allowed_actions]
+      properties:
+        key: { type: string }
+        description: { type: string, nullable: true }
+        allowed_values:
+          type: array
+          nullable: true
+          items: { type: string }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    TagPolicyListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/TagPolicy' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+
+    # ---------------------------------------------------------------- plans & operations
+    PlanKind:
+      type: string
+      enum: [grant, revoke, transfer_ownership, edit_metadata, assign_tags, remove_tags,
+             set_row_filter, drop_row_filter, set_column_mask, drop_column_mask,
+             replace_view_definition, delete_asset, update_binding,
+             create_abac_policy, update_abac_policy, delete_abac_policy,
+             update_share_permissions, update_recipient, create_quality_monitor,
+             refresh_quality_monitor, apply_access_request]
+    GrantChanges:
+      type: object
+      required: [principal, privileges]
+      properties:
+        principal: { type: string, minLength: 1 }
+        privileges:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string }
+    OwnershipChanges:
+      type: object
+      required: [new_owner]
+      properties:
+        new_owner: { type: string, minLength: 1 }
+    MetadataChanges:
+      type: object
+      properties:
+        comment: { type: string, nullable: true, maxLength: 4000 }
+        properties:
+          type: object
+          additionalProperties: { type: string }
+        column_comments:
+          type: object
+          additionalProperties: { type: string, nullable: true }
+    TagChanges:
+      type: object
+      required: [tags]
+      properties:
+        column: { type: string, nullable: true }
+        tags:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [key]
+            properties:
+              key: { type: string }
+              value: { type: string, nullable: true }
+    RowFilterChanges:
+      type: object
+      required: [function_full_name, input_columns]
+      properties:
+        function_full_name: { type: string }
+        input_columns:
+          type: array
+          items: { type: string }
+    ColumnMaskChanges:
+      type: object
+      required: [column, function_full_name, using_columns]
+      properties:
+        column: { type: string }
+        function_full_name: { type: string }
+        using_columns:
+          type: array
+          items: { type: string }
+    DropChanges:
+      type: object
+      properties:
+        column: { type: string, nullable: true }
+    ViewDefinitionChanges:
+      type: object
+      required: [definition, expected_current_definition_hash]
+      properties:
+        definition: { type: string }
+        expected_current_definition_hash: { type: string, description: SHA-256 of the definition the user saw }
+    GenericChanges:
+      type: object
+      description: Kind-specific payload for platform/sharing/quality/policy kinds; validated server-side per kind
+      additionalProperties: true
+    PlanChanges:
+      description: |
+        Kind-specific payload. The server selects the schema by the plan's `kind` and validates
+        strictly; the shapes below are documentation and code-generation input, not a discriminated
+        union (several share a `column` field).
+      anyOf:
+        - $ref: '#/components/schemas/GrantChanges'
+        - $ref: '#/components/schemas/OwnershipChanges'
+        - $ref: '#/components/schemas/MetadataChanges'
+        - $ref: '#/components/schemas/TagChanges'
+        - $ref: '#/components/schemas/RowFilterChanges'
+        - $ref: '#/components/schemas/ColumnMaskChanges'
+        - $ref: '#/components/schemas/DropChanges'
+        - $ref: '#/components/schemas/ViewDefinitionChanges'
+        - $ref: '#/components/schemas/GenericChanges'
+    PlanCreateRequest:
+      type: object
+      required: [kind, targets, changes, reason]
+      properties:
+        kind: { $ref: '#/components/schemas/PlanKind' }
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            required: [securable_type, full_name]
+            properties:
+              securable_type: { $ref: '#/components/schemas/SecurableType' }
+              full_name: { type: string }
+        changes: { $ref: '#/components/schemas/PlanChanges' }
+        reason: { type: string, minLength: 3, maxLength: 200 }
+        access_request_id: { type: string, format: uuid, nullable: true }
+    PlanStatus:
+      type: string
+      enum: [previewed, confirmed, revalidating, executing, applied, partially_applied, failed,
+             unknown, expired, stale, invalidated]
+    NormalizedChange:
+      type: object
+      required: [target, description, statement_preview]
+      properties:
+        target: { $ref: '#/components/schemas/AssetRef' }
+        description: { type: string, description: "Plain English, e.g. Grant SELECT to `analysts`" }
+        statement_preview: { type: string, description: "Exact API/SQL change to be sent, for the Details expander" }
+    Impact:
+      type: object
+      required: [known, unknown]
+      properties:
+        known:
+          type: array
+          items: { type: string }
+        unknown:
+          type: array
+          items: { type: string }
+          description: Always lists what could not be determined; never invents counts
+    Plan:
+      type: object
+      required: [id, kind, status, identity, workspace_id, environment_label, targets,
+                 normalized_changes, observed_state_hash, impact, prerequisite_notes,
+                 inheritance_note, requires_typed_confirmation, typed_confirmation_value,
+                 atomic, expires_at, confirmation_token, created_at, invalidated_by, access_request_id]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/PlanKind' }
+        status: { $ref: '#/components/schemas/PlanStatus' }
+        identity: { $ref: '#/components/schemas/Identity' }
+        workspace_id: { type: string, nullable: true }
+        environment_label: { type: string }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/AssetRef' }
+        normalized_changes:
+          type: array
+          items: { $ref: '#/components/schemas/NormalizedChange' }
+        observed_state_hash: { type: string }
+        impact: { $ref: '#/components/schemas/Impact' }
+        prerequisite_notes:
+          type: array
+          items: { type: string }
+          description: e.g. "`analysts` also needs USE_CATALOG on sales — not included in this change"
+        inheritance_note: { type: string, nullable: true }
+        requires_typed_confirmation: { type: boolean }
+        typed_confirmation_value: { type: string, nullable: true, description: The exact string the user must type }
+        atomic: { type: boolean, description: false for multi-target plans }
+        expires_at: { type: string, format: date-time }
+        confirmation_token: { type: string, description: Server HMAC over the plan; opaque to the client }
+        created_at: { type: string, format: date-time }
+        invalidated_by: { type: string, format: uuid, nullable: true }
+        access_request_id: { type: string, format: uuid, nullable: true }
+    PlanResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/Plan' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    PlanExecuteRequest:
+      type: object
+      required: [confirmation_token]
+      properties:
+        confirmation_token: { type: string }
+        typed_name: { type: string, nullable: true }
+    OperationStatus:
+      type: string
+      enum: [executing, applied, partially_applied, failed, unknown]
+    TargetOutcomeStatus:
+      type: string
+      enum: [pending, applied, failed, unknown, skipped]
+    TargetOutcome:
+      type: object
+      required: [target, status, verified, verified_at, databricks_request_id, error, summary]
+      properties:
+        target: { $ref: '#/components/schemas/AssetRef' }
+        status: { $ref: '#/components/schemas/TargetOutcomeStatus' }
+        verified: { type: boolean, description: true only when read-back confirmed the change }
+        verified_at: { type: string, format: date-time, nullable: true }
+        databricks_request_id: { type: string, nullable: true }
+        error:
+          type: object
+          nullable: true
+          required: [code, message]
+          properties:
+            code: { $ref: '#/components/schemas/ErrorCode' }
+            message: { type: string }
+        summary: { type: string, description: e.g. "Direct SELECT grant to `analysts` verified by read-back" }
+    Operation:
+      type: object
+      required: [id, plan_id, kind, status, identity, started_at, finished_at, atomic, targets,
+                 reconcile_available, summary, correlation_id]
+      properties:
+        id: { type: string, format: uuid }
+        plan_id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/PlanKind' }
+        status: { $ref: '#/components/schemas/OperationStatus' }
+        identity: { $ref: '#/components/schemas/Identity' }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        atomic: { type: boolean }
+        targets:
+          type: array
+          items: { $ref: '#/components/schemas/TargetOutcome' }
+        reconcile_available: { type: boolean }
+        summary: { type: string }
+        correlation_id: { type: string }
+    OperationResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/Operation' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- policies
+    AbacPolicyType:
+      type: string
+      enum: [row_filter, column_mask]
+    AbacPolicy:
+      type: object
+      required: [id, name, policy_type, scope, when_condition, to_principals, except_principals,
+                 function_full_name, match_columns, owner, created_at, updated_at, allowed_actions]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        policy_type: { $ref: '#/components/schemas/AbacPolicyType' }
+        scope: { $ref: '#/components/schemas/AssetRef' }
+        when_condition: { type: string, description: "Tag predicate, verbatim" }
+        to_principals:
+          type: array
+          items: { type: string }
+        except_principals:
+          type: array
+          items: { type: string }
+        function_full_name: { type: string }
+        match_columns:
+          type: array
+          items: { type: string }
+        owner: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    AbacPolicyResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/AbacPolicy' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AbacPolicyListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AbacPolicy' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    PolicyImpactResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [potentially_affected, disclaimer]
+          properties:
+            potentially_affected:
+              type: array
+              items: { $ref: '#/components/schemas/AssetSummary' }
+            disclaimer:
+              type: string
+              description: Always "Potentially affected within your visible scope. Not evaluated by Databricks."
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- filters / functions
+    RowAccessResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [target, row_filter, column_masks, allowed_actions]
+          properties:
+            target: { $ref: '#/components/schemas/AssetRef' }
+            row_filter:
+              nullable: true
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/RowFilterRef'
+            column_masks:
+              type: array
+              items: { $ref: '#/components/schemas/ColumnMaskRef' }
+            allowed_actions:
+              type: array
+              items: { $ref: '#/components/schemas/AllowedAction' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    FunctionParameter:
+      type: object
+      required: [name, type_text, position]
+      properties:
+        name: { type: string }
+        type_text: { type: string }
+        position: { type: integer }
+    FunctionDetail:
+      type: object
+      required: [full_name, owner, comment, return_type, parameters, language, dependents,
+                 used_as_policy_function, allowed_actions]
+      properties:
+        full_name: { type: string }
+        owner: { type: string, nullable: true }
+        comment: { type: string, nullable: true }
+        return_type: { type: string, nullable: true }
+        parameters:
+          type: array
+          items: { $ref: '#/components/schemas/FunctionParameter' }
+        language: { type: string, nullable: true }
+        dependents:
+          type: array
+          items: { $ref: '#/components/schemas/Dependency' }
+        used_as_policy_function: { type: boolean, nullable: true }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    FunctionDetailResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/FunctionDetail' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- storage
+    StorageCredential:
+      type: object
+      required: [name, owner, cloud_provider, read_only, isolation_mode, comment, created_at,
+                 used_for_managed_storage, allowed_actions]
+      properties:
+        name: { type: string }
+        owner: { type: string, nullable: true }
+        cloud_provider: { type: string, nullable: true, description: aws_iam_role | azure_managed_identity | gcp_service_account | unknown }
+        read_only: { type: boolean, nullable: true }
+        isolation_mode: { type: string, nullable: true, enum: [ISOLATION_MODE_OPEN, ISOLATION_MODE_ISOLATED, null] }
+        comment: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        used_for_managed_storage: { type: boolean, nullable: true }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    StorageCredentialListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/StorageCredential' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    ExternalLocation:
+      type: object
+      required: [name, url, credential_name, owner, read_only, isolation_mode, comment, created_at, allowed_actions]
+      properties:
+        name: { type: string }
+        url: { type: string }
+        credential_name: { type: string, nullable: true }
+        owner: { type: string, nullable: true }
+        read_only: { type: boolean, nullable: true }
+        isolation_mode: { type: string, nullable: true, enum: [ISOLATION_MODE_OPEN, ISOLATION_MODE_ISOLATED, null] }
+        comment: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    ExternalLocationListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ExternalLocation' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    WorkspaceBinding:
+      type: object
+      required: [workspace_id, binding_type]
+      properties:
+        workspace_id: { type: string }
+        binding_type: { type: string, enum: [BINDING_TYPE_READ_WRITE, BINDING_TYPE_READ_ONLY] }
+    WorkspaceBindingResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [target, isolation_mode, bindings, current_workspace_bound, allowed_actions]
+          properties:
+            target: { $ref: '#/components/schemas/AssetRef' }
+            isolation_mode: { type: string, enum: [ISOLATION_MODE_OPEN, ISOLATION_MODE_ISOLATED] }
+            bindings:
+              type: array
+              items: { $ref: '#/components/schemas/WorkspaceBinding' }
+            current_workspace_bound: { type: boolean, nullable: true }
+            allowed_actions:
+              type: array
+              items: { $ref: '#/components/schemas/AllowedAction' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- federation
+    Connection:
+      type: object
+      required: [name, connection_type, owner, read_only, comment, options_nonsecret, foreign_catalogs,
+                 created_at, allowed_actions]
+      properties:
+        name: { type: string }
+        connection_type: { type: string, description: Raw Databricks connection type string }
+        owner: { type: string, nullable: true }
+        read_only: { type: boolean, nullable: true }
+        comment: { type: string, nullable: true }
+        options_nonsecret:
+          type: object
+          additionalProperties: { type: string }
+          description: Allowlisted keys only (host, port, database...). Never password/token/secret keys.
+        foreign_catalogs:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time, nullable: true }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    ConnectionListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Connection' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+
+    # ---------------------------------------------------------------- sharing
+    SharedObject:
+      type: object
+      required: [full_name, data_object_type, shared_as, has_row_filter_or_mask]
+      properties:
+        full_name: { type: string }
+        data_object_type: { type: string }
+        shared_as: { type: string, nullable: true }
+        has_row_filter_or_mask: { type: boolean, nullable: true, description: Controls may not carry across sharing modes }
+    Share:
+      type: object
+      required: [name, owner, comment, objects, recipients, external_exposure, created_at, allowed_actions]
+      properties:
+        name: { type: string }
+        owner: { type: string, nullable: true }
+        comment: { type: string, nullable: true }
+        objects:
+          type: array
+          items: { $ref: '#/components/schemas/SharedObject' }
+        recipients:
+          type: array
+          items: { type: string }
+        external_exposure:
+          type: string
+          enum: [confirmed_external, internal_only, unknown]
+        created_at: { type: string, format: date-time, nullable: true }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    ShareListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Share' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    Recipient:
+      type: object
+      required: [name, authentication_type, owner, activated, comment, created_at, secrets_note, allowed_actions]
+      properties:
+        name: { type: string }
+        authentication_type: { type: string, enum: [TOKEN, DATABRICKS, unknown] }
+        owner: { type: string, nullable: true }
+        activated: { type: boolean, nullable: true }
+        comment: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        secrets_note:
+          type: string
+          description: Always "Token values and activation links are never returned by this application."
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    RecipientListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Recipient' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+
+    # ---------------------------------------------------------------- lineage
+    LineageDirection:
+      type: string
+      enum: [upstream, downstream, both]
+    LineageNode:
+      type: object
+      required: [id, ref, visible, depth]
+      properties:
+        id: { type: string }
+        ref:
+          nullable: true
+          type: object
+          description: "null when the caller may not see the object"
+          allOf:
+            - $ref: '#/components/schemas/AssetRef'
+        visible: { type: boolean }
+        depth: { type: integer }
+    LineageEdge:
+      type: object
+      required: [from, to, last_seen_at, via]
+      properties:
+        from: { type: string }
+        to: { type: string }
+        last_seen_at: { type: string, format: date-time, nullable: true }
+        via: { type: string, nullable: true, description: "notebook, job, pipeline, query id when known" }
+    LineageResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [root, direction, depth, nodes, edges, truncated, window_start, window_end, coverage_note]
+          properties:
+            root: { $ref: '#/components/schemas/AssetRef' }
+            direction: { $ref: '#/components/schemas/LineageDirection' }
+            depth: { type: integer }
+            nodes:
+              type: array
+              items: { $ref: '#/components/schemas/LineageNode' }
+            edges:
+              type: array
+              items: { $ref: '#/components/schemas/LineageEdge' }
+            truncated: { type: boolean }
+            window_start: { type: string, format: date-time }
+            window_end: { type: string, format: date-time }
+            coverage_note:
+              type: string
+              description: Always present; e.g. "Lineage from system tables for the last 30 days. No returned lineage does not mean no dependencies."
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- activity
+    AuditOutcome:
+      type: string
+      enum: [success, failure, unknown]
+    AuditEvent:
+      type: object
+      required: [event_time, actor, execution_identity, service, action, target_full_name, outcome,
+                 request_id, source_table]
+      properties:
+        event_time: { type: string, format: date-time }
+        actor: { type: string, nullable: true }
+        execution_identity: { type: string, nullable: true }
+        service: { type: string }
+        action: { type: string }
+        target_full_name: { type: string, nullable: true }
+        outcome: { $ref: '#/components/schemas/AuditOutcome' }
+        request_id: { type: string, nullable: true }
+        source_table: { type: string, description: e.g. system.access.audit }
+    AuditEventListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEvent' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    AuditCorrelation:
+      type: string
+      enum: [verified, partial, unavailable]
+    AppActivityEvent:
+      type: object
+      required: [id, at, actor, executor, action, target, plan_id, operation_id, outcome,
+                 correlation_id, databricks_request_id, audit_correlation]
+      properties:
+        id: { type: string, format: uuid }
+        at: { type: string, format: date-time }
+        actor: { type: string }
+        executor: { type: string }
+        action: { type: string }
+        target:
+          nullable: true
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/AssetRef'
+        plan_id: { type: string, format: uuid, nullable: true }
+        operation_id: { type: string, format: uuid, nullable: true }
+        outcome:
+          nullable: true
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/OperationStatus'
+        correlation_id: { type: string }
+        databricks_request_id: { type: string, nullable: true }
+        audit_correlation: { $ref: '#/components/schemas/AuditCorrelation' }
+    AppActivityListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AppActivityEvent' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    FindingRule:
+      type: string
+      enum: [missing_owner, missing_description, broad_grant, external_share, sensitive_tag_without_mask,
+             policy_coverage_gap]
+    FindingSeverity:
+      type: string
+      enum: [info, low, medium, high]
+    Finding:
+      type: object
+      required: [id, rule, severity, asset, summary, evidence, observed_at, disclaimer]
+      properties:
+        id: { type: string }
+        rule: { $ref: '#/components/schemas/FindingRule' }
+        severity: { $ref: '#/components/schemas/FindingSeverity' }
+        asset: { $ref: '#/components/schemas/AssetRef' }
+        summary: { type: string }
+        evidence:
+          type: array
+          items: { type: string }
+        observed_at: { type: string, format: date-time }
+        disclaimer: { type: string, description: "Always \"Review signal, not a compliance violation.\"" }
+    FindingListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Finding' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+
+    # ---------------------------------------------------------------- quality
+    QualityRefresh:
+      type: object
+      required: [refresh_id, state, start_time, end_time, trigger]
+      properties:
+        refresh_id: { type: string }
+        state: { type: string }
+        start_time: { type: string, format: date-time, nullable: true }
+        end_time: { type: string, format: date-time, nullable: true }
+        trigger: { type: string, nullable: true }
+    QualityMonitor:
+      type: object
+      required: [table_full_name, status, monitor_type, output_schema_name, latest_refresh, refreshes,
+                 compute_note, allowed_actions]
+      properties:
+        table_full_name: { type: string }
+        status: { type: string, description: Raw monitor status string }
+        monitor_type: { type: string, nullable: true, enum: [snapshot, time_series, inference, null] }
+        output_schema_name: { type: string, nullable: true }
+        latest_refresh:
+          nullable: true
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/QualityRefresh'
+        refreshes:
+          type: array
+          items: { $ref: '#/components/schemas/QualityRefresh' }
+        compute_note: { type: string, description: Shown before create/refresh; states that refreshes consume compute }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    QualityMonitorResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/QualityMonitor' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- ai assets
+    ModelVersion:
+      type: object
+      required: [model_full_name, version, status, owner, comment, created_at, aliases, allowed_actions]
+      properties:
+        model_full_name: { type: string }
+        version: { type: integer }
+        status: { type: string, nullable: true }
+        owner: { type: string, nullable: true }
+        comment: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        aliases:
+          type: array
+          items: { type: string }
+        allowed_actions:
+          type: array
+          items: { $ref: '#/components/schemas/AllowedAction' }
+    ModelVersionListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ModelVersion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    ServingEndpoint:
+      type: object
+      required: [name, state, served_models, related_service_note]
+      properties:
+        name: { type: string }
+        state: { type: string, nullable: true }
+        served_models:
+          type: array
+          items: { type: string, description: UC model full names when known }
+        related_service_note:
+          type: string
+          description: Always "Model Serving permissions are managed separately from Unity Catalog grants."
+    ServingEndpointListResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ServingEndpoint' }
+        meta: { $ref: '#/components/schemas/Meta' }
+
+    # ---------------------------------------------------------------- access requests
+    AccessRequestStatus:
+      type: string
+      enum: [submitted, approved, rejected, applying, applied, failed, unknown, expired, cancelled]
+    WorkflowOwner:
+      type: string
+      enum: [application, databricks_native]
+    AccessRequestCreate:
+      type: object
+      required: [beneficiary, target, privileges, reason]
+      properties:
+        beneficiary: { type: string, description: Principal name; may equal requester }
+        target:
+          type: object
+          required: [securable_type, full_name]
+          properties:
+            securable_type: { $ref: '#/components/schemas/SecurableType' }
+            full_name: { type: string }
+        privileges:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { type: string }
+        reason: { type: string, minLength: 3, maxLength: 500 }
+        requested_until: { type: string, format: date-time, nullable: true, description: Only honored when durable store and scheduler are configured }
+    AccessRequest:
+      type: object
+      required: [id, workflow_owner, requester, beneficiary, target, privileges, reason, status,
+                 approver, decided_at, decision_comment, requested_until, plan_id, operation_id,
+                 created_at, updated_at, allowed_actions]
+      properties:
+        id: { type: string, format: uuid }
+        workflow_owner: { $ref: '#/components/schemas/WorkflowOwner' }
+        requester: { type: string }
+        beneficiary: { $ref: '#/components/schemas/Principal' }
+        target: { $ref: '#/components/schemas/AssetRef' }
+        privileges:
+          type: array
+          items: { type: string }
+        reason: { type: string }
+        status: { $ref: '#/components/schemas/AccessRequestStatus' }
+        approver: { type: string, nullable: true }
+        decided_at: { type: string, format: date-time, nullable: true }
+        decision_comment: { type: string, nullable: true }
+        requested_until: { type: string, format: date-time, nullable: true }
+        plan_id: { type: string, format: uuid, nullable: true }
+        operation_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        allowed_actions:
+          type: array
+          items:
+            type: object
+            required: [action, allowed]
+            properties:
+              action: { type: string, enum: [approve, reject, cancel, apply, view_operation] }
+              allowed: { type: boolean }
+              reason_code: { type: string, nullable: true }
+              reason: { type: string, nullable: true }
+    AccessRequestResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/AccessRequest' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AccessRequestListResponse:
+      type: object
+      required: [success, data, meta, page]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AccessRequest' }
+        meta: { $ref: '#/components/schemas/Meta' }
+        page: { $ref: '#/components/schemas/Page' }
+    AccessDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approve, reject] }
+        comment: { type: string, maxLength: 500, nullable: true }
+
+    # ---------------------------------------------------------------- admin
+    Metastore:
+      type: object
+      required: [id, name, region, cloud, owner, assigned_workspace_ids, created_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        region: { type: string, nullable: true }
+        cloud: { type: string, nullable: true }
+        owner: { type: string, nullable: true }
+        assigned_workspace_ids:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time, nullable: true }
+    MetastoreListResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Metastore' }
+        meta: { $ref: '#/components/schemas/Meta' }

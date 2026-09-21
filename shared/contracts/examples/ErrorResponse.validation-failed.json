@@ -1,0 +1,10 @@
+{
+  "success": false,
+  "code": "VALIDATION_FAILED",
+  "message": "The request could not be validated.",
+  "correlation_id": "c0ffee00-0000-4000-8000-000000000007",
+  "errors": [
+    { "field": "changes.privileges[1]", "code": "INVALID_PRIVILEGE_FOR_TYPE", "message": "USE_CATALOG is not a valid privilege on a TABLE." },
+    { "field": "reason", "code": "TOO_SHORT", "message": "Reason must be between 3 and 200 characters." }
+  ]
+}

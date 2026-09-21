@@ -1,0 +1,66 @@
+# Databricks Apps manifest for the Unity Catalog Governance application.
+#
+# Platform facts this file depends on, verified against the official documentation on 2026-09-21
+# and recorded in docs/04-databricks-apps-constraints.md:
+#   - `command` is a sequence and is NOT run through a shell, so no shell syntax works here.
+#   - DATABRICKS_APP_PORT is the one exception: it is substituted into the command at runtime.
+#   - The app must bind 0.0.0.0 on that port.
+#   - Python dependencies are installed from requirements.txt, which is generated from uv.lock.
+#   - DATABRICKS_HOST, DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are injected by the
+#     platform. They must never appear in this file.
+#
+# The backend serves the API under /api/v1 and the built frontend from frontend/dist at /, so this
+# is a single process. Build the frontend before deploying: npm --prefix frontend run build.
+
+command:
+  - uvicorn
+  - app.main:create_app
+  - --factory
+  - --app-dir
+  - backend
+  - --host
+  - 0.0.0.0
+  - --port
+  - $DATABRICKS_APP_PORT
+
+env:
+  # Python needs to find the `app` package inside backend/.
+  - name: PYTHONPATH
+    value: backend
+
+  # Required. fixture is deliberately impossible here: backend/app/config/settings.py refuses to
+  # start in fixture mode when DATABRICKS_APP_PORT or DATABRICKS_CLIENT_ID is present, so a
+  # deployed app can never serve synthetic data as if it were real.
+  # connected_readonly is the safe first deployment: every mutation endpoint returns
+  # MODE_READ_ONLY, so nothing in the workspace can be changed by this app.
+  - name: UCGOV_MODE
+    value: connected_readonly
+
+  # Shown in the interface. Configured, never inferred from a host name.
+  - name: UCGOV_ENVIRONMENT_LABEL
+    value: DEV
+
+  # Comma-separated catalogs this app is allowed to manage. Empty means every catalog the
+  # executing identity can already see. Narrow this before enabling write mode.
+  - name: UCGOV_MANAGED_CATALOGS
+    value: ""
+
+  # Plan previews expire after this many seconds.
+  - name: UCGOV_PLAN_TTL_SECONDS
+    value: "600"
+
+  # Separation of duties: a requester may not approve their own access request.
+  - name: UCGOV_SOD_ENABLED
+    value: "true"
+
+  # Optional resources, intentionally not configured for this deployment. The capability endpoint
+  # reports the dependent features as not_configured rather than pretending they work.
+  #
+  # A SQL warehouse is needed for lineage, audit system tables, tags via SQL, and row filters.
+  # - name: UCGOV_WAREHOUSE_ID
+  #   valueFrom: sql-warehouse
+  #
+  # The HMAC key that makes mutation plans tamper-evident. Required before enabling write mode.
+  # Supply it from a secret resource, never as a literal value.
+  # - name: UCGOV_PLAN_HMAC_KEY
+  #   valueFrom: plan-hmac-key

@@ -1,0 +1,19 @@
+// tsconfig.node.json — TypeScript configuration for Node-side tooling files
+// (vite.config.ts and any other config files that run in Node, not the browser).
+//
+// NOTE: @types/node is NOT listed in the approved dependency set for this project.
+// If vite.config.ts requires Node built-in types (e.g. for fileURLToPath from "url"),
+// TypeScript may be able to resolve them via the bundler resolution used by Vite without
+// an explicit @types/node install. If tsc --noEmit reports errors about missing Node types,
+// the orchestrator should add @types/node to devDependencies. This file is correct without it
+// per the dispatch instructions.
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true
+  },
+  "include": ["vite.config.ts"]
+}

@@ -1,0 +1,65 @@
+{
+  "success": true,
+  "data": {
+    "id": "5f3c9a2e-1b7d-4e0a-9c11-2d6f8a0b1c22",
+    "kind": "grant",
+    "status": "previewed",
+    "identity": {
+      "actor": {
+        "id": "u-1001",
+        "display": "alice.steward@example.test",
+        "kind": "user",
+        "roles": ["steward", "access_admin"],
+        "verified_by": "fixture"
+      },
+      "executor": {
+        "kind": "service_principal",
+        "display": "uc-governance-app (sp-7f3a…)",
+        "reason": "The Unity Catalog grants API is not in the user-authorization scope set."
+      }
+    },
+    "workspace_id": null,
+    "environment_label": "DEV",
+    "targets": [
+      { "securable_type": "TABLE", "full_name": "sales.crm.orders", "kind": "table", "display_name": "orders" }
+    ],
+    "normalized_changes": [
+      {
+        "target": { "securable_type": "TABLE", "full_name": "sales.crm.orders", "kind": "table", "display_name": "orders" },
+        "description": "Grant SELECT to `marketing-analysts`",
+        "statement_preview": "grants.update(securable_type=TABLE, full_name=\"sales.crm.orders\", changes=[{principal: \"marketing-analysts\", add: [\"SELECT\"]}])"
+      }
+    ],
+    "observed_state_hash": "sha256:9b1c…e3f0",
+    "impact": {
+      "known": [
+        "Adds a direct SELECT grant on sales.crm.orders for `marketing-analysts`.",
+        "`marketing-analysts` has no existing direct grants on this table."
+      ],
+      "unknown": [
+        "Whether `marketing-analysts` already has SELECT through another group.",
+        "Number of members in `marketing-analysts` (membership not loaded)."
+      ]
+    },
+    "prerequisite_notes": [
+      "`marketing-analysts` also needs USE_CATALOG on sales and USE_SCHEMA on sales.crm to read this table. Those privileges are not included in this change."
+    ],
+    "inheritance_note": null,
+    "requires_typed_confirmation": false,
+    "typed_confirmation_value": null,
+    "atomic": true,
+    "expires_at": "2026-09-21T09:15:30Z",
+    "confirmation_token": "v1.5f3c9a2e.7a1d3e9c0b2f4a6e8d1c3b5a7f9e0d2c4b6a8f1e3d5c7b9a0f2e4d6c8b1a3f5e",
+    "created_at": "2026-09-21T09:05:30Z",
+    "invalidated_by": null,
+    "access_request_id": null
+  },
+  "meta": {
+    "source": "fixture",
+    "observed_at": "2026-09-21T09:05:30Z",
+    "scope": { "catalog": "sales", "schema": "crm" },
+    "completeness": "complete",
+    "limitations": ["Preview is read-only. Nothing has been changed."],
+    "correlation_id": "c0ffee00-0000-4000-8000-000000000004"
+  }
+}

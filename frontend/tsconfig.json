@@ -1,0 +1,40 @@
+// tsconfig.json — Browser-side TypeScript configuration for the UC Governance frontend.
+//
+// NOTE: shared/contracts/types.ts lives outside src/ on purpose.
+// It is the single source of API types (owned by the orchestrator, immutable).
+// The @contracts/* path alias makes `import type { Plan } from "@contracts/types"` resolve
+// to ../shared/contracts/types.ts without copying the file into src/.
+{
+  "compilerOptions": {
+    // Target and module
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "moduleResolution": "bundler",
+
+    // JSX
+    "jsx": "react-jsx",
+
+    // Strictness
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Module discipline
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+
+    // Output
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    // Path aliases — must match the aliases in vite.config.ts
+    "paths": {
+      "@/*": ["./src/*"],
+      "@contracts/*": ["../shared/contracts/*"]
+    }
+  },
+  "include": ["src", "e2e"]
+}
