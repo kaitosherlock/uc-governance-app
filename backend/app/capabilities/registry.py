@@ -100,8 +100,12 @@ def probe(declaration: Declaration, settings: Settings) -> Capability:
         if declaration.status == CapabilityStatusValue.NOT_IMPLEMENTED:
             reason += " Implementation is also pending."
     return Capability(
-        capability=declaration.capability, domain=declaration.domain, status=status, reason=reason,
-        requires=list(declaration.requires), checked_at=datetime.now(UTC),
+        capability=declaration.capability,
+        domain=declaration.domain,
+        status=status,
+        reason=reason,
+        requires=list(declaration.requires),
+        checked_at=datetime.now(UTC),
     )
 
 

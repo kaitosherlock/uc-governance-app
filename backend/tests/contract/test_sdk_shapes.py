@@ -11,9 +11,8 @@ import inspect
 from typing import get_type_hints
 
 import pytest
-from databricks.sdk import AccountClient, WorkspaceClient
-
 from app.tools.introspect_sdk import dto_fields, service_class
+from databricks.sdk import AccountClient, WorkspaceClient
 
 SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
     ("catalogs", "create", ("name", "connection_name", "options")),
@@ -26,16 +25,28 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
     ("schemas", "get", ("full_name", "include_browse")),
     ("schemas", "list", ("catalog_name", "max_results", "page_token")),
     ("schemas", "update", ("full_name", "comment", "owner", "properties")),
-    ("tables", "create",
-     ("name", "catalog_name", "schema_name", "table_type", "data_source_format",
-      "storage_location")),
+    (
+        "tables",
+        "create",
+        (
+            "name",
+            "catalog_name",
+            "schema_name",
+            "table_type",
+            "data_source_format",
+            "storage_location",
+        ),
+    ),
     ("tables", "delete", ("full_name",)),
     ("tables", "get", ("full_name", "include_browse")),
     ("tables", "list", ("catalog_name", "schema_name", "max_results", "page_token")),
     ("tables", "update", ("full_name", "owner")),
     ("grants", "get", ("securable_type", "full_name")),
-    ("grants", "get_effective",
-     ("securable_type", "full_name", "max_results", "page_token", "principal")),
+    (
+        "grants",
+        "get_effective",
+        ("securable_type", "full_name", "max_results", "page_token", "principal"),
+    ),
     ("grants", "update", ("securable_type", "full_name", "changes")),
     ("volumes", "create", ("catalog_name", "schema_name", "name", "volume_type")),
     ("volumes", "delete", ("name",)),
@@ -97,10 +108,16 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
     ("providers", "list", ("max_results", "page_token")),
     ("providers", "list_shares", ("name", "max_results", "page_token")),
     ("providers", "update", ("name", "comment", "owner")),
-    ("workspace_bindings", "get_bindings",
-     ("securable_type", "securable_name", "max_results", "page_token")),
-    ("workspace_bindings", "update_bindings",
-     ("securable_type", "securable_name", "add", "remove")),
+    (
+        "workspace_bindings",
+        "get_bindings",
+        ("securable_type", "securable_name", "max_results", "page_token"),
+    ),
+    (
+        "workspace_bindings",
+        "update_bindings",
+        ("securable_type", "securable_name", "add", "remove"),
+    ),
     ("quality_monitors", "create", ("table_name", "output_schema_name", "assets_dir")),
     ("quality_monitors", "delete", ("table_name",)),
     ("quality_monitors", "get", ("table_name",)),
@@ -112,8 +129,11 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
     ("serving_endpoints", "get_permissions", ("serving_endpoint_id",)),
     ("serving_endpoints", "list", ()),
     ("statement_execution", "cancel_execution", ("statement_id",)),
-    ("statement_execution", "execute_statement",
-     ("statement", "warehouse_id", "on_wait_timeout", "parameters", "row_limit", "wait_timeout")),
+    (
+        "statement_execution",
+        "execute_statement",
+        ("statement", "warehouse_id", "on_wait_timeout", "parameters", "row_limit", "wait_timeout"),
+    ),
     ("statement_execution", "get_statement", ("statement_id",)),
     ("statement_execution", "get_statement_result_chunk_n", ("statement_id", "chunk_index")),
     ("users", "get", ("id",)),
@@ -127,8 +147,11 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
     ("entity_tag_assignments", "delete", ("entity_type", "entity_name", "tag_key")),
     ("entity_tag_assignments", "get", ("entity_type", "entity_name", "tag_key")),
     ("entity_tag_assignments", "list", ("entity_type", "entity_name", "max_results", "page_token")),
-    ("entity_tag_assignments", "update",
-     ("entity_type", "entity_name", "tag_key", "tag_assignment", "update_mask")),
+    (
+        "entity_tag_assignments",
+        "update",
+        ("entity_type", "entity_name", "tag_key", "tag_assignment", "update_mask"),
+    ),
     ("tag_policies", "create_tag_policy", ("tag_policy",)),
     ("tag_policies", "delete_tag_policy", ("tag_key",)),
     ("tag_policies", "get_tag_policy", ("tag_key",)),
@@ -137,22 +160,45 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
     ("policies", "create_policy", ("policy_info",)),
     ("policies", "delete_policy", ("on_securable_type", "on_securable_fullname", "name")),
     ("policies", "get_policy", ("on_securable_type", "on_securable_fullname", "name")),
-    ("policies", "list_policies",
-     ("on_securable_type", "on_securable_fullname", "include_inherited", "max_results",
-      "page_token")),
-    ("policies", "update_policy",
-     ("on_securable_type", "on_securable_fullname", "name", "policy_info")),
+    (
+        "policies",
+        "list_policies",
+        (
+            "on_securable_type",
+            "on_securable_fullname",
+            "include_inherited",
+            "max_results",
+            "page_token",
+        ),
+    ),
+    (
+        "policies",
+        "update_policy",
+        ("on_securable_type", "on_securable_fullname", "name", "policy_info"),
+    ),
     ("rfa", "batch_create_access_requests", ()),
     ("rfa", "get_access_request_destinations", ("securable_type", "full_name")),
     ("rfa", "update_access_request_destinations", ("access_request_destinations", "update_mask")),
-    ("external_lineage", "create_external_lineage_relationship",
-     ("external_lineage_relationship",)),
-    ("external_lineage", "delete_external_lineage_relationship",
-     ("external_lineage_relationship",)),
-    ("external_lineage", "list_external_lineage_relationships",
-     ("object_info", "lineage_direction")),
-    ("external_lineage", "update_external_lineage_relationship",
-     ("external_lineage_relationship", "update_mask")),
+    (
+        "external_lineage",
+        "create_external_lineage_relationship",
+        ("external_lineage_relationship",),
+    ),
+    (
+        "external_lineage",
+        "delete_external_lineage_relationship",
+        ("external_lineage_relationship",),
+    ),
+    (
+        "external_lineage",
+        "list_external_lineage_relationships",
+        ("object_info", "lineage_direction"),
+    ),
+    (
+        "external_lineage",
+        "update_external_lineage_relationship",
+        ("external_lineage_relationship", "update_mask"),
+    ),
     ("external_metadata", "create_external_metadata", ("external_metadata",)),
     ("external_metadata", "delete_external_metadata", ("name",)),
     ("external_metadata", "get_external_metadata", ("name",)),
@@ -200,14 +246,24 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
 DTO_FIELDS = {
     ("tables", "get"): {
         "databricks.sdk.service.catalog.TableInfo": (
-            "full_name", "owner", "comment", "properties", "table_type", "pipeline_id",
-            "row_filter", "columns", "view_definition", "view_dependencies",
+            "full_name",
+            "owner",
+            "comment",
+            "properties",
+            "table_type",
+            "pipeline_id",
+            "row_filter",
+            "columns",
+            "view_definition",
+            "view_dependencies",
         ),
         "databricks.sdk.service.catalog.ColumnInfo": ("name", "comment", "mask", "type_name"),
     },
     ("grants", "get_effective"): {
         "databricks.sdk.service.catalog.EffectivePrivilege": (
-            "privilege", "inherited_from_name", "inherited_from_type",
+            "privilege",
+            "inherited_from_name",
+            "inherited_from_type",
         ),
     },
     ("groups", "get"): {"databricks.sdk.service.iam.Group": ("id", "members", "display_name")},
@@ -219,11 +275,14 @@ DTO_FIELDS = {
 
 
 @pytest.mark.parametrize(
-    ("service", "method", "required_params"), SDK_OPERATIONS,
+    ("service", "method", "required_params"),
+    SDK_OPERATIONS,
     ids=[f"{service}.{method}" for service, method, _ in SDK_OPERATIONS],
 )
 def test_sdk_operation_shape(
-    service: str, method: str, required_params: tuple[str, ...],
+    service: str,
+    method: str,
+    required_params: tuple[str, ...],
 ) -> None:
     client = AccountClient if service.startswith("account.") else WorkspaceClient
     name = service.removeprefix("account.")

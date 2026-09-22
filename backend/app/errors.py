@@ -5,8 +5,12 @@ from app.api.v1.models import ErrorCode, FieldError
 
 class AppError(Exception):
     def __init__(
-        self, code: ErrorCode, message: str, http_status: int,
-        next_steps: list[str] | None = None, errors: list[FieldError] | None = None,
+        self,
+        code: ErrorCode,
+        message: str,
+        http_status: int,
+        next_steps: list[str] | None = None,
+        errors: list[FieldError] | None = None,
     ) -> None:
         if not 400 <= http_status <= 599 or code == ErrorCode.OUTCOME_UNKNOWN:
             raise ValueError("HTTP errors require a failure status and an HTTP error code.")
@@ -25,7 +29,10 @@ class StandardError(AppError):
     default_message: str
 
     def __init__(
-        self, message: str | None = None, *, next_steps: list[str] | None = None,
+        self,
+        message: str | None = None,
+        *,
+        next_steps: list[str] | None = None,
         errors: list[FieldError] | None = None,
     ) -> None:
         super().__init__(

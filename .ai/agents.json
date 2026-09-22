@@ -1,160 +1,160 @@
 {
-  "$comment": "Machine-readable agent configuration for the orchestrator. scripts/dispatch.ps1 and scripts/resume.ps1 read this file. Every value below was probed on this machine; do not add a flag or model id that was not verified.",
-  "verified_at": "2026-09-21",
-  "agents": {
-    "backend": {
-      "role": "Backend Coder",
-      "owns": [
-        "backend/**",
-        "app.yaml",
-        "pyproject.toml",
-        "requirements.txt",
-        "uv.lock",
-        "jobs/**",
-        "docs/capability-matrix.md",
-        "docs/runbook.md"
-      ],
-      "instruction_file": "BACKEND_INSTRUCTION.md",
-      "cli": "codex",
-      "status": "READY",
-      "detected_at": "C:\\Users\\admin\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe",
-      "auth": "Logged in using ChatGPT (codex login status, 2026-09-21)",
-      "command_template": "codex exec --model {model} --config model_reasoning_effort={effort} --sandbox workspace-write --cd {root} --skip-git-repo-check --color never --output-last-message {lastmsg}",
-      "prompt_mode": "stdin",
-      "session_resume_template": "codex exec resume {session} --model {model} --config model_reasoning_effort={effort} --skip-git-repo-check --output-last-message {lastmsg}",
-      "session_resume_last_flag": "--last",
-      "models": {
-        "tier_reasoning": "gpt-5.6-terra",
-        "tier_standard": "gpt-5.6-terra",
-        "tier_utility": "gpt-5.6-terra"
-      },
-      "models_note": "User directive 2026-09-22: switch codex to terra. The real slug is `gpt-5.6-terra`, extracted from the codex binary where it appears alongside gpt-6-astra and gpt-6-pro, including the provider-qualified forms openai.gpt-5.6-terra and global.openai.gpt-5.6-terra. It was NOT guessed from the word 'terra'. Tiers stay differentiated by model_reasoning_effort because the codex CLI exposes no model-listing subcommand.",
-      "effort_values": {
-        "tier_reasoning": "high",
-        "tier_standard": "medium",
-        "tier_utility": "low"
-      },
-      "quota": {
-        "state": "exhausted",
-        "exhausted_at": "2026-09-22T04:20:01.6270726Z",
-        "last_ok_at": "2026-09-22T03:59:33.7475259Z",
-        "note": "Set to exhausted by dispatch.ps1 when the output matches a quota signature; cleared by resume.ps1 after a successful probe."
-      },
-      "session_resume_note": "`codex exec resume` accepts a NARROWER flag set than `codex exec`: it rejects --sandbox, --cd and --color. Those are inherited from the original session. Verified 2026-09-21 from `codex exec resume --help`. The working directory comes from the process cwd, which the dispatcher sets to the project root.",
-      "models_previous": {
-        "tier_reasoning": "gpt-6-astra",
-        "tier_standard": "gpt-6-astra",
-        "tier_utility": "gpt-6-astra"
-      }
-    },
-    "frontend": {
-      "role": "Frontend Coder",
-      "owns": [
-        "frontend/**",
-        "screenshots/**",
-        "docs/07-design-brief.md",
-        "docs/browser-review.md",
-        "docs/a11y-manual-checks.md"
-      ],
-      "instruction_file": "FRONTEND_INSTRUCTION.md",
-      "cli": "agy",
-      "status": "READY",
-      "detected_at": "C:\\Users\\admin\\AppData\\Local\\agy\\bin\\agy.exe",
-      "auth": "Assumed configured; `agy models` returned a live list on 2026-09-21",
-      "install_note": "The Antigravity CLI is the binary `agy`. `antigravity` is not a command on this machine.",
-      "command_template": "agy --model {model} --output-format json --add-dir {root} --mode accept-edits",
-      "prompt_mode": "file_pointer",
-      "prompt_flag": "--print=",
-      "session_resume_template": "agy --conversation {session} --model {model} --output-format json --add-dir {root} --mode accept-edits",
-      "session_resume_last_flag": "--continue",
-      "models": {
-        "tier_reasoning": "gemini-3.1-pro-high",
-        "tier_standard": "gemini-3.8-flash-high",
-        "tier_utility": "gemini-3.8-flash-medium"
-      },
-      "models_alternate": {
-        "tier_reasoning": "gemini-3.1-pro-low",
-        "tier_standard": "gemini-3.7-flash-high"
-      },
-      "models_available": [
-        "gemini-3.8-flash-high",
-        "gemini-3.8-flash-medium",
-        "gemini-3.8-flash-low",
-        "gemini-3.7-flash-high",
-        "gemini-3.7-flash-medium",
-        "gemini-3.7-flash-low",
-        "gemini-3.6-flash-high",
-        "gemini-3.6-flash-medium",
-        "gemini-3.6-flash-low",
-        "gemini-3.1-pro-high",
-        "gemini-3.1-pro-low",
-        "claude-sonnet-4-6",
-        "claude-opus-4-6-thinking",
-        "gpt-oss-120b-medium"
-      ],
-      "quota": {
-        "state": "exhausted",
-        "exhausted_at": "2026-09-22T04:36:50.764373+00:00",
-        "last_ok_at": "2026-09-22T04:35:48.2528741Z",
-        "note": "Same handling as the backend lane."
-      },
-      "prompt_mode_reason": "Windows PowerShell 5.1 re-splits a long multi-line native argument on whitespace, which turned prompt text such as --noEmit into a CLI flag. The prompt is written to a file and passed as one whitespace-free pointer token. Verified 2026-09-21.",
-      "effort_note": "agy encodes reasoning effort in the model id itself, e.g. gemini-3.8-flash-medium. Passing --effort alongside such a model is rejected as a conflict, so --effort is not used on this lane; the tier is expressed entirely by the model id. Verified 2026-09-21.",
-      "output_note": "--output-format json returns {conversation_id, status, response, duration_seconds, num_turns, usage}. conversation_id enables precise resume; text format prints no id and would force a fallback to --continue. Verified 2026-09-21.",
-      "models_previous": {
-        "tier_reasoning": "claude-opus-4-6-thinking",
-        "tier_standard": "claude-sonnet-4-6",
-        "tier_utility": "gemini-3.8-flash-medium"
-      },
-      "models_note": "User directive 2026-09-22: run Antigravity on Gemini only. The Claude and GPT entries are deliberately left in models_available as a record of what the CLI offers, but no tier binds to them. Every id here was taken from `agy models`. agy encodes reasoning effort in the model id, so --effort is never passed."
-    }
-  },
-  "tiers": {
-    "tier_reasoning": "Architecture, mutation lifecycle and state machine, authorization and identity logic, SDK adapter design, ABAC and lineage algorithms, anything under backend/app/auth, authz, mutations, adapters/sql.",
-    "tier_standard": "Standard endpoints, CRUD, UI components, styling, routing, forms, tables.",
-    "tier_utility": "Unit tests from an existing spec, fixtures and mocks, schema translation, doc tables, mechanical refactors."
-  },
-  "dispatch_rules": {
-    "always_print_mode": true,
-    "never_interactive": true,
-    "log_dir": ".ai/logs",
-    "state_dir": ".ai/state",
-    "one_task_per_dispatch": true,
-    "gate1_before_every_dispatch": true,
-    "forbidden_flags": [
-      "--dangerously-bypass-approvals-and-sandbox",
-      "--dangerously-bypass-hook-trust",
-      "--dangerously-skip-permissions"
-    ],
-    "forbidden_flags_reason": "Both agents stay inside a sandbox and the permission boundary; the orchestrator reviews diffs instead of bypassing approval."
-  },
-  "quota_detection": {
-    "$comment": "Case-insensitive regex alternatives matched against combined stdout and stderr. Deliberately NOT generic: this project implements a RATE_LIMITED error code and tests HTTP 429, so an agent's own successful output can legitimately contain the words 'rate limit', '429', and 'quota'. Matching those alone would falsely defer completed work.",
-    "require_nonzero_exit": true,
-    "require_nonzero_exit_reason": "A run that exited 0 produced its deliverable. Quota exhaustion always aborts the run, so exit 0 plus a quota-looking word is a false positive, not a deferral.",
-    "patterns": [
-      "usage limit",
-      "you have (hit|reached) your",
-      "you've (hit|reached) your",
-      "insufficient_quota",
-      "quota exceeded",
-      "rate limit exceeded",
-      "out of (tokens|credits)",
-      "no (tokens|credits) (left|remaining)",
-      "credit balance",
-      "upgrade your plan",
-      "resource[_ ]exhausted",
-      "too many requests",
-      "plan limit",
-      "monthly limit",
-      "limit reached",
-      "individual quota reached"
-    ],
-    "exit_code_when_detected": 75,
-    "exit_code_meaning": "75 is EX_TEMPFAIL: the task is not failed, it is deferred. Never mark the task done or failed on this code.",
-    "manual_override": "If a CLI ever reports exhaustion in wording not listed here, set agents.<lane>.quota.state to 'exhausted' by hand. dispatch.ps1 then defers that lane with exit 75, and resume.ps1 probes it. Afterwards add the real wording from .ai/logs/ to the patterns above.",
-    "refine_from": "The matched pattern is written into the run record as quota_pattern, so the first real exhaustion becomes evidence for tightening this list.",
-    "observed_wording": "agy on 2026-09-22 returned: RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 4h15m34s. Exit code 3. Matched by the resource[_ ]exhausted pattern; the exact phrase was added afterwards as evidence-based refinement.",
-    "agy_exit_code_caveat": "agy can exit 0 while reporting a quota failure in its JSON result. Test-QuotaExhausted therefore treats \"status\":\"ERROR\"/\"RESOURCE_EXHAUSTED\"/\"FAILED\" or an AGY_ERROR line as a failed run even on exit 0. Observed 2026-09-22."
-  }
+    "$comment":  "Machine-readable agent configuration for the orchestrator. scripts/dispatch.ps1 and scripts/resume.ps1 read this file. Every value below was probed on this machine; do not add a flag or model id that was not verified.",
+    "verified_at":  "2026-09-21",
+    "agents":  {
+                   "backend":  {
+                                   "role":  "Backend Coder",
+                                   "owns":  [
+                                                "backend/**",
+                                                "app.yaml",
+                                                "pyproject.toml",
+                                                "requirements.txt",
+                                                "uv.lock",
+                                                "jobs/**",
+                                                "docs/capability-matrix.md",
+                                                "docs/runbook.md"
+                                            ],
+                                   "instruction_file":  "BACKEND_INSTRUCTION.md",
+                                   "cli":  "codex",
+                                   "status":  "READY",
+                                   "detected_at":  "C:\\Users\\admin\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe",
+                                   "auth":  "Logged in using ChatGPT (codex login status, 2026-09-21)",
+                                   "command_template":  "codex exec --model {model} --config model_reasoning_effort={effort} --sandbox workspace-write --cd {root} --skip-git-repo-check --color never --output-last-message {lastmsg}",
+                                   "prompt_mode":  "stdin",
+                                   "session_resume_template":  "codex exec resume {session} --model {model} --config model_reasoning_effort={effort} --skip-git-repo-check --output-last-message {lastmsg}",
+                                   "session_resume_last_flag":  "--last",
+                                   "models":  {
+                                                  "tier_reasoning":  "gpt-5.6-terra",
+                                                  "tier_standard":  "gpt-5.6-terra",
+                                                  "tier_utility":  "gpt-5.6-terra"
+                                              },
+                                   "models_note":  "User directive 2026-09-22: switch codex to terra. The real slug is `gpt-5.6-terra`, extracted from the codex binary where it appears alongside gpt-6-astra and gpt-6-pro, including the provider-qualified forms openai.gpt-5.6-terra and global.openai.gpt-5.6-terra. It was NOT guessed from the word \u0027terra\u0027. Tiers stay differentiated by model_reasoning_effort because the codex CLI exposes no model-listing subcommand.",
+                                   "effort_values":  {
+                                                         "tier_reasoning":  "high",
+                                                         "tier_standard":  "medium",
+                                                         "tier_utility":  "low"
+                                                     },
+                                   "quota":  {
+                                                 "state":  "exhausted",
+                                                 "exhausted_at":  "2026-09-22T07:49:07.6989679Z",
+                                                 "last_ok_at":  "2026-09-22T07:36:39.8274991Z",
+                                                 "note":  "Set to exhausted by dispatch.ps1 when the output matches a quota signature; cleared by resume.ps1 after a successful probe."
+                                             },
+                                   "session_resume_note":  "`codex exec resume` accepts a NARROWER flag set than `codex exec`: it rejects --sandbox, --cd and --color. Those are inherited from the original session. Verified 2026-09-21 from `codex exec resume --help`. The working directory comes from the process cwd, which the dispatcher sets to the project root.",
+                                   "models_previous":  {
+                                                           "tier_reasoning":  "gpt-6-astra",
+                                                           "tier_standard":  "gpt-6-astra",
+                                                           "tier_utility":  "gpt-6-astra"
+                                                       }
+                               },
+                   "frontend":  {
+                                    "role":  "Frontend Coder",
+                                    "owns":  [
+                                                 "frontend/**",
+                                                 "screenshots/**",
+                                                 "docs/07-design-brief.md",
+                                                 "docs/browser-review.md",
+                                                 "docs/a11y-manual-checks.md"
+                                             ],
+                                    "instruction_file":  "FRONTEND_INSTRUCTION.md",
+                                    "cli":  "agy",
+                                    "status":  "READY",
+                                    "detected_at":  "C:\\Users\\admin\\AppData\\Local\\agy\\bin\\agy.exe",
+                                    "auth":  "Assumed configured; `agy models` returned a live list on 2026-09-21",
+                                    "install_note":  "The Antigravity CLI is the binary `agy`. `antigravity` is not a command on this machine.",
+                                    "command_template":  "agy --model {model} --output-format json --add-dir {root} --mode accept-edits",
+                                    "prompt_mode":  "file_pointer",
+                                    "prompt_flag":  "--print=",
+                                    "session_resume_template":  "agy --conversation {session} --model {model} --output-format json --add-dir {root} --mode accept-edits",
+                                    "session_resume_last_flag":  "--continue",
+                                    "models":  {
+                                                   "tier_reasoning":  "gemini-3.1-pro-high",
+                                                   "tier_standard":  "gemini-3.8-flash-high",
+                                                   "tier_utility":  "gemini-3.8-flash-medium"
+                                               },
+                                    "models_alternate":  {
+                                                             "tier_reasoning":  "gemini-3.1-pro-low",
+                                                             "tier_standard":  "gemini-3.7-flash-high"
+                                                         },
+                                    "models_available":  [
+                                                             "gemini-3.8-flash-high",
+                                                             "gemini-3.8-flash-medium",
+                                                             "gemini-3.8-flash-low",
+                                                             "gemini-3.7-flash-high",
+                                                             "gemini-3.7-flash-medium",
+                                                             "gemini-3.7-flash-low",
+                                                             "gemini-3.6-flash-high",
+                                                             "gemini-3.6-flash-medium",
+                                                             "gemini-3.6-flash-low",
+                                                             "gemini-3.1-pro-high",
+                                                             "gemini-3.1-pro-low",
+                                                             "claude-sonnet-4-6",
+                                                             "claude-opus-4-6-thinking",
+                                                             "gpt-oss-120b-medium"
+                                                         ],
+                                    "quota":  {
+                                                  "state":  "ok",
+                                                  "exhausted_at":  null,
+                                                  "last_ok_at":  "2026-09-22T07:53:56.0718823Z",
+                                                  "note":  "Same handling as the backend lane."
+                                              },
+                                    "prompt_mode_reason":  "Windows PowerShell 5.1 re-splits a long multi-line native argument on whitespace, which turned prompt text such as --noEmit into a CLI flag. The prompt is written to a file and passed as one whitespace-free pointer token. Verified 2026-09-21.",
+                                    "effort_note":  "agy encodes reasoning effort in the model id itself, e.g. gemini-3.8-flash-medium. Passing --effort alongside such a model is rejected as a conflict, so --effort is not used on this lane; the tier is expressed entirely by the model id. Verified 2026-09-21.",
+                                    "output_note":  "--output-format json returns {conversation_id, status, response, duration_seconds, num_turns, usage}. conversation_id enables precise resume; text format prints no id and would force a fallback to --continue. Verified 2026-09-21.",
+                                    "models_previous":  {
+                                                            "tier_reasoning":  "claude-opus-4-6-thinking",
+                                                            "tier_standard":  "claude-sonnet-4-6",
+                                                            "tier_utility":  "gemini-3.8-flash-medium"
+                                                        },
+                                    "models_note":  "User directive 2026-09-22: run Antigravity on Gemini only. The Claude and GPT entries are deliberately left in models_available as a record of what the CLI offers, but no tier binds to them. Every id here was taken from `agy models`. agy encodes reasoning effort in the model id, so --effort is never passed."
+                                }
+               },
+    "tiers":  {
+                  "tier_reasoning":  "Architecture, mutation lifecycle and state machine, authorization and identity logic, SDK adapter design, ABAC and lineage algorithms, anything under backend/app/auth, authz, mutations, adapters/sql.",
+                  "tier_standard":  "Standard endpoints, CRUD, UI components, styling, routing, forms, tables.",
+                  "tier_utility":  "Unit tests from an existing spec, fixtures and mocks, schema translation, doc tables, mechanical refactors."
+              },
+    "dispatch_rules":  {
+                           "always_print_mode":  true,
+                           "never_interactive":  true,
+                           "log_dir":  ".ai/logs",
+                           "state_dir":  ".ai/state",
+                           "one_task_per_dispatch":  true,
+                           "gate1_before_every_dispatch":  true,
+                           "forbidden_flags":  [
+                                                   "--dangerously-bypass-approvals-and-sandbox",
+                                                   "--dangerously-bypass-hook-trust",
+                                                   "--dangerously-skip-permissions"
+                                               ],
+                           "forbidden_flags_reason":  "Both agents stay inside a sandbox and the permission boundary; the orchestrator reviews diffs instead of bypassing approval."
+                       },
+    "quota_detection":  {
+                            "$comment":  "Case-insensitive regex alternatives matched against combined stdout and stderr. Deliberately NOT generic: this project implements a RATE_LIMITED error code and tests HTTP 429, so an agent\u0027s own successful output can legitimately contain the words \u0027rate limit\u0027, \u0027429\u0027, and \u0027quota\u0027. Matching those alone would falsely defer completed work.",
+                            "require_nonzero_exit":  true,
+                            "require_nonzero_exit_reason":  "A run that exited 0 produced its deliverable. Quota exhaustion always aborts the run, so exit 0 plus a quota-looking word is a false positive, not a deferral.",
+                            "patterns":  [
+                                             "usage limit",
+                                             "you have (hit|reached) your",
+                                             "you\u0027ve (hit|reached) your",
+                                             "insufficient_quota",
+                                             "quota exceeded",
+                                             "rate limit exceeded",
+                                             "out of (tokens|credits)",
+                                             "no (tokens|credits) (left|remaining)",
+                                             "credit balance",
+                                             "upgrade your plan",
+                                             "resource[_ ]exhausted",
+                                             "too many requests",
+                                             "plan limit",
+                                             "monthly limit",
+                                             "limit reached",
+                                             "individual quota reached"
+                                         ],
+                            "exit_code_when_detected":  75,
+                            "exit_code_meaning":  "75 is EX_TEMPFAIL: the task is not failed, it is deferred. Never mark the task done or failed on this code.",
+                            "manual_override":  "If a CLI ever reports exhaustion in wording not listed here, set agents.\u003clane\u003e.quota.state to \u0027exhausted\u0027 by hand. dispatch.ps1 then defers that lane with exit 75, and resume.ps1 probes it. Afterwards add the real wording from .ai/logs/ to the patterns above.",
+                            "refine_from":  "The matched pattern is written into the run record as quota_pattern, so the first real exhaustion becomes evidence for tightening this list.",
+                            "observed_wording":  "agy on 2026-09-22 returned: RESOURCE_EXHAUSTED (code 429): Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 4h15m34s. Exit code 3. Matched by the resource[_ ]exhausted pattern; the exact phrase was added afterwards as evidence-based refinement.",
+                            "agy_exit_code_caveat":  "agy can exit 0 while reporting a quota failure in its JSON result. Test-QuotaExhausted therefore treats \"status\":\"ERROR\"/\"RESOURCE_EXHAUSTED\"/\"FAILED\" or an AGY_ERROR line as a failed run even on exit 0. Observed 2026-09-22."
+                        }
 }

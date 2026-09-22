@@ -13,14 +13,17 @@ logger = logging.getLogger(__name__)
 
 
 async def resolve_identity(
-    request: Request, settings: Settings, resolver: UserIdentityResolver | None,
+    request: Request,
+    settings: Settings,
+    resolver: UserIdentityResolver | None,
 ) -> Identity:
     if settings.mode == Mode.FIXTURE:
         if resolver is None:
             raise Unauthenticated("Fixture identity resolver is not configured.")
         user = await resolver.resolve(settings.fixture_actor or "")
         executor = Executor(
-            kind="service_principal", display="synthetic-governance-app@example.test",
+            kind="service_principal",
+            display="synthetic-governance-app@example.test",
             reason="Governance changes execute only against synthetic in-memory fixture state.",
         )
     else:
@@ -40,7 +43,8 @@ async def resolve_identity(
             logger.warning("Forwarded identity mismatch")
             raise IdentityMismatch()
         executor = Executor(
-            kind="user", display=user.actor.display,
+            kind="user",
+            display=user.actor.display,
             reason="These read endpoints use the authenticated user's identity.",
         )
     return Identity(actor=user.actor, executor=executor)
@@ -48,11 +52,14 @@ async def resolve_identity(
 
 async def current_identity(request: Request) -> Identity:
     identity = await resolve_identity(
-        request, request.app.state.settings, request.app.state.identity_resolver,
+        request,
+        request.app.state.settings,
+        request.app.state.identity_resolver,
     )
     # Only auth reads forwarded credentials. Reader construction performs no live calls.
     request.state.read_access_token = (
-        "" if request.app.state.settings.mode == Mode.FIXTURE
+        ""
+        if request.app.state.settings.mode == Mode.FIXTURE
         else request.headers.get("x-forwarded-access-token", "").strip()
     )
     return identity

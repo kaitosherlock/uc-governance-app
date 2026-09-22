@@ -108,8 +108,13 @@ function Build-Invocation {
         if ([string]::IsNullOrWhiteSpace($template)) { throw "Agent has no command_template." }
     }
 
-    $lastMsg = ''
-    if ($LastMessageFile) { $lastMsg = $LastMessageFile }
+    # `{lastmsg}` is a FLAG VALUE in the templates (`--output-last-message {lastmsg}`). Rendering it
+    # as an empty string leaves the flag dangling and codex exits 2 with "a value is required".
+    # Callers that do not care about the last message (the quota probe) get a throwaway temp path.
+    if ([string]::IsNullOrWhiteSpace($LastMessageFile)) {
+        $LastMessageFile = Join-Path ([System.IO.Path]::GetTempPath()) ("agentrun-lastmsg-" + [guid]::NewGuid().ToString('N') + ".txt")
+    }
+    $lastMsg = $LastMessageFile
     $rendered = $template.Replace('{model}', $Model).Replace('{effort}', $Effort).Replace('{root}', $Root).Replace('{lastmsg}', $lastMsg)
 
     # Split on whitespace, but keep a quoted segment glued to whatever it is attached to, so

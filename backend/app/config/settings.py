@@ -53,8 +53,10 @@ class Settings(BaseSettings):
         default=SecretStr("verify-full"), validation_alias="PGSSLMODE", repr=False, exclude=True
     )
     pg_appname: SecretStr = Field(
-        default=SecretStr("uc-governance-app"), validation_alias="PGAPPNAME",
-        repr=False, exclude=True,
+        default=SecretStr("uc-governance-app"),
+        validation_alias="PGAPPNAME",
+        repr=False,
+        exclude=True,
     )
     pg_password: SecretStr = Field(
         default=SecretStr(""), validation_alias="PGPASSWORD", repr=False, exclude=True
@@ -81,9 +83,14 @@ class Settings(BaseSettings):
 
     @property
     def durable_store_configured(self) -> bool:
-        return all(value.get_secret_value().strip() for value in (
-            self.pg_host, self.pg_database, self.pg_user,
-        ))
+        return all(
+            value.get_secret_value().strip()
+            for value in (
+                self.pg_host,
+                self.pg_database,
+                self.pg_user,
+            )
+        )
 
     @property
     def account_client_configured(self) -> bool:

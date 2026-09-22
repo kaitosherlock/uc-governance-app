@@ -28,14 +28,19 @@ def test_secrets_redacted_after_interpolation_and_in_tracebacks() -> None:
             raise RuntimeError("Bearer synthetic-bearer-value " + env["PGPASSWORD"])
         except RuntimeError:
             logger.exception(
-                "values %s and SERVICE_TOKEN=synthetic-inline-value", list(env.values()),
+                "values %s and SERVICE_TOKEN=synthetic-inline-value",
+                list(env.values()),
                 extra={"details": {"nested": {"NEW_SECRET": "synthetic-structured-value"}}},
             )
     finally:
         correlation_id.reset(token)
     line = stream.getvalue()
-    for secret in [*env.values(), "synthetic-bearer-value", "synthetic-inline-value",
-                   "synthetic-structured-value"]:
+    for secret in [
+        *env.values(),
+        "synthetic-bearer-value",
+        "synthetic-inline-value",
+        "synthetic-structured-value",
+    ]:
         assert secret not in line
     record = json.loads(line)
     assert record["correlation_id"] == "test-correlation"
@@ -43,10 +48,15 @@ def test_secrets_redacted_after_interpolation_and_in_tracebacks() -> None:
     assert "[REDACTED]" in line
 
 
-@pytest.mark.parametrize("message", [
-    "Bearer synthetic-bearer", "{'PGPASSWORD': 'synthetic-keyed'}",
-    'EXAMPLE_SECRET="synthetic-keyed"', "PGHOST=synthetic-keyed",
-])
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Bearer synthetic-bearer",
+        "{'PGPASSWORD': 'synthetic-keyed'}",
+        'EXAMPLE_SECRET="synthetic-keyed"',
+        "PGHOST=synthetic-keyed",
+    ],
+)
 def test_redaction_without_environment_value(message: str) -> None:
     record = logging.LogRecord("test", logging.INFO, "test", 1, message, (), None)
     RedactionFilter({}).filter(record)

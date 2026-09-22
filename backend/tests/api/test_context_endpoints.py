@@ -13,7 +13,12 @@ def test_context_endpoints(client: TestClient, path: str) -> None:
     assert set(body) == {"success", "data", "meta"}
     assert body["success"] is True
     assert set(body["meta"]) == {
-        "source", "observed_at", "scope", "completeness", "limitations", "correlation_id",
+        "source",
+        "observed_at",
+        "scope",
+        "completeness",
+        "limitations",
+        "correlation_id",
     }
     assert body["meta"]["source"] == "fixture"
     assert body["meta"]["correlation_id"] == "synthetic-request-id"

@@ -7,8 +7,13 @@ from app.errors import NotImplementedYet
 
 def test_only_implemented_read_capabilities_available() -> None:
     assert {row.capability for row in REGISTRY if row.status == Status.AVAILABLE} == {
-        "context.read", "identity.read", "capabilities.read",
-        "assets.read", "grants.read", "principals.search", "privileges.read",
+        "context.read",
+        "identity.read",
+        "capabilities.read",
+        "assets.read",
+        "grants.read",
+        "principals.search",
+        "privileges.read",
     }
     assert len({row.capability for row in REGISTRY}) == len(REGISTRY)
     assert all(row.domain for row in REGISTRY)

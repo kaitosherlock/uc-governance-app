@@ -1,6 +1,7 @@
 """Explicit domain-to-wire mapping."""
-from app.domain import models as d
+
 from app.api.v1 import models as w
+from app.domain import models as d
 
 
 def map_AllowedAction(value: d.AllowedAction) -> w.AllowedAction:

@@ -6,8 +6,13 @@ from app.config.settings import Mode
 
 def identity(role: AppRole) -> Identity:
     return Identity(
-        actor=Actor(id="synthetic-user", display="user@example.test", kind=ActorKind.USER,
-                    roles=[role], verified_by="fixture"),
+        actor=Actor(
+            id="synthetic-user",
+            display="user@example.test",
+            kind=ActorKind.USER,
+            roles=[role],
+            verified_by="fixture",
+        ),
         executor=Executor(kind="user", display="user@example.test", reason="Unit test."),
     )
 
@@ -26,27 +31,33 @@ def test_scope_denial_for_every_role(role: AppRole) -> None:
     assert result.reason_code == ErrorCode.FORBIDDEN_SCOPE
 
 
-@pytest.mark.parametrize(("role", "action", "allowed"), [
-    (AppRole.VIEWER, "assets.read", True),
-    (AppRole.STEWARD, "edit_metadata", True),
-    (AppRole.STEWARD, "transfer_ownership", True),
-    (AppRole.STEWARD, "grant", False),
-    (AppRole.ACCESS_ADMIN, "grant", True),
-    (AppRole.ACCESS_ADMIN, "approve", True),
-    (AppRole.ACCESS_ADMIN, "update_binding", False),
-    (AppRole.AUDITOR, "export", True),
-    (AppRole.AUDITOR, "edit_metadata", False),
-    (AppRole.PLATFORM_ADMIN, "update_binding", True),
-    (AppRole.PLATFORM_ADMIN, "bypass_sod", False),
-    (AppRole.PLATFORM_ADMIN, "unregistered.read", False),
-])
+@pytest.mark.parametrize(
+    ("role", "action", "allowed"),
+    [
+        (AppRole.VIEWER, "assets.read", True),
+        (AppRole.STEWARD, "edit_metadata", True),
+        (AppRole.STEWARD, "transfer_ownership", True),
+        (AppRole.STEWARD, "grant", False),
+        (AppRole.ACCESS_ADMIN, "grant", True),
+        (AppRole.ACCESS_ADMIN, "approve", True),
+        (AppRole.ACCESS_ADMIN, "update_binding", False),
+        (AppRole.AUDITOR, "export", True),
+        (AppRole.AUDITOR, "edit_metadata", False),
+        (AppRole.PLATFORM_ADMIN, "update_binding", True),
+        (AppRole.PLATFORM_ADMIN, "bypass_sod", False),
+        (AppRole.PLATFORM_ADMIN, "unregistered.read", False),
+    ],
+)
 def test_role_table(role: AppRole, action: str, allowed: bool) -> None:
     assert decide(identity(role), action, Target("sales")).allowed is allowed
 
 
 def test_readonly_denies_platform_admin_mutation() -> None:
     result = decide(
-        identity(AppRole.PLATFORM_ADMIN), "grant", Target(), mode=Mode.CONNECTED_READONLY,
+        identity(AppRole.PLATFORM_ADMIN),
+        "grant",
+        Target(),
+        mode=Mode.CONNECTED_READONLY,
     )
     assert result.reason_code == ErrorCode.MODE_READ_ONLY
 

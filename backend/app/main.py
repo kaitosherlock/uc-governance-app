@@ -12,8 +12,8 @@ from app.api.errors_handler import register_exception_handlers
 from app.api.middleware import CorrelationMiddleware, OriginGuardMiddleware
 from app.api.v1.routes_context import router
 from app.api.v1.routes_reads import router as reads_router
-from app.container import Container
 from app.config.settings import Mode, assert_mode_is_safe, load_settings
+from app.container import Container
 from app.errors import NotFound
 from app.logging_setup import configure_logging
 
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
         app.state.identity_resolver = FixtureIdentityResolver()
     else:
         from app.adapters.databricks.factory import SDKIdentityResolver
+
         app.state.identity_resolver = SDKIdentityResolver(settings)
     app.include_router(router, prefix="/api/v1")
     app.include_router(reads_router, prefix="/api/v1")

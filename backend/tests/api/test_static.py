@@ -6,7 +6,8 @@ from fastapi.testclient import TestClient
 
 
 def test_missing_frontend_does_not_prevent_startup(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(main, "STATIC_DIRECTORY", tmp_path / "missing")
     with TestClient(main.create_app()) as client:

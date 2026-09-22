@@ -75,7 +75,16 @@ foreach ($lane in $lanes) {
     Write-Host "Probing '$lane' quota via $($spec.cli)..." -ForegroundColor Cyan
     if ($DryRun) { Write-Host '  DRY RUN: probe skipped'; $available[$lane] = $false; continue }
 
-    $probeInv = Build-Invocation -Spec $spec -Config $config -Model $spec.models.tier_utility `
+    # Probe with the model the pending work will ACTUALLY use. Quota is per-model on the agy lane:
+    # on 2026-09-22 gemini-3.8-flash-medium answered READY while gemini-3.1-pro-high was still
+    # RESOURCE_EXHAUSTED, so a tier_utility probe reported "quota is back" and the real resume then
+    # burned a call and failed. Highest tier among this lane's pending tasks is the honest probe.
+    $laneTiers = @($pending | Where-Object { $_.Record.agent -eq $lane } | ForEach-Object { $_.Record.tier })
+    $probeTier = @('tier_reasoning','tier_standard','tier_utility') | Where-Object { $laneTiers -contains $_ } | Select-Object -First 1
+    if (-not $probeTier) { $probeTier = 'tier_utility' }
+    $probeModel = $spec.models.$probeTier
+    Write-Host "  probing with $probeTier model '$probeModel'" -ForegroundColor DarkCyan
+    $probeInv = Build-Invocation -Spec $spec -Config $config -Model $probeModel `
         -Effort 'low' -Root $root -LastMessageFile ''
     $probe = Invoke-AgentRun -Invocation $probeInv `
         -Prompt 'Reply with the single word READY. Do not read or modify any file.' `
@@ -134,6 +143,16 @@ Do this now:
 The API contract in shared/contracts/ is unchanged and remains immutable.
 "@
 
+    # A task-specific resume prompt wins over the generic one. The generic text tells the agent to
+    # re-check what it wrote and to re-run the verification commands; on the agy lane both of those
+    # need the denied `command` permission and end the turn with nothing written. Per-task prompts
+    # carry the file inventory and the write order instead.
+    $resumePromptPath = Join-Path $root (".ai/prompts/" + $rec.task_id + "-resume.md")
+    if (Test-Path $resumePromptPath) {
+        $continuation = Get-Content $resumePromptPath -Raw
+        Write-Host "  using task-specific resume prompt: .ai/prompts/$($rec.task_id)-resume.md" -ForegroundColor DarkCyan
+    }
+
     Write-Host ''
     Write-Host "RESUME  task=$($rec.task_id)  agent=$($rec.agent)  session=$session  attempt=$([int]$rec.attempt + 1)" -ForegroundColor Yellow
 
@@ -148,6 +167,9 @@ The API contract in shared/contracts/ is unchanged and remains immutable.
     Write-RunRecord -Path $p.Path -Record @{
         status = 'resuming'; attempt = ([int]$rec.attempt + 1)
         resumed_at = (Get-Date).ToUniversalTime().ToString('o'); log = $paths.Log
+        # The model comes from the CURRENT bindings, not from the record, so a resume after a model
+        # switch would otherwise leave the record naming the model that is no longer in use.
+        model = $spec.models.($rec.tier)
     }
 
     $result = Invoke-AgentRun -Invocation $inv -Prompt $continuation -LogFile $paths.Log `

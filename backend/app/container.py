@@ -1,4 +1,5 @@
 """Application-owned dependencies; fixture datasets are isolated per app instance."""
+
 import json
 from pathlib import Path
 
@@ -11,18 +12,28 @@ class Container:
         self.settings = settings
         self.fixture_readers: Readers | None = None
         from app.adapters.databricks.common import CursorStore
+
         self.cursors = CursorStore()
         if settings.mode == Mode.FIXTURE:
             from app.adapters.fixtures.readers import FixtureReaders
+
             adapter = FixtureReaders()
-            path = Path(__file__).parent / 'fixtures_data' / 'privilege_codes.json'
-            values = json.loads(path.read_text(encoding='utf-8'))
-            self.fixture_readers = Readers(catalogs=adapter, schemas=adapter, objects=adapter,
-                assets=adapter, grants=adapter, principals=adapter, dependencies=adapter,
-                privilege_codes=tuple(str(v) for v in values))
+            path = Path(__file__).parent / "fixtures_data" / "privilege_codes.json"
+            values = json.loads(path.read_text(encoding="utf-8"))
+            self.fixture_readers = Readers(
+                catalogs=adapter,
+                schemas=adapter,
+                objects=adapter,
+                assets=adapter,
+                grants=adapter,
+                principals=adapter,
+                dependencies=adapter,
+                privilege_codes=tuple(str(v) for v in values),
+            )
 
     def readers_for(self, access_token: str) -> Readers:
         if self.fixture_readers is not None:
             return self.fixture_readers
         from app.adapters.databricks.factory import sdk_readers
+
         return sdk_readers(self.settings, access_token, self.cursors)

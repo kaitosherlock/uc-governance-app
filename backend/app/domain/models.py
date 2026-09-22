@@ -1,15 +1,44 @@
 """Frozen domain dataclasses; no SDK or API dependencies."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
-from app.domain.enums import (SecurableType, ObjectKind, ManagedStatus, ActionName, TagKind, AttachmentSource, DependencyKind, PrincipalKind, PrincipalScope, PrivilegeCategory, GrantSourceType)
+
+from app.domain.enums import (
+    ActionName,
+    AttachmentSource,
+    DependencyKind,
+    GrantSourceType,
+    ManagedStatus,
+    ObjectKind,
+    PrincipalKind,
+    PrincipalScope,
+    PrivilegeCategory,
+    SecurableType,
+    TagKind,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
 class AllowedAction:
     action: ActionName
     allowed: bool
-    reason_code: Literal['INHERITED_FROM_PARENT', 'ROLE_INSUFFICIENT', 'MODE_READ_ONLY', 'NOT_IMPLEMENTED', 'NOT_CONFIGURED', 'UNSUPPORTED_FOR_TYPE', 'PIPELINE_MANAGED', 'SYSTEM_TAG', 'OUT_OF_SCOPE', 'INSUFFICIENT_PRIVILEGES', 'UNKNOWN'] | None = None
+    reason_code: (
+        Literal[
+            "INHERITED_FROM_PARENT",
+            "ROLE_INSUFFICIENT",
+            "MODE_READ_ONLY",
+            "NOT_IMPLEMENTED",
+            "NOT_CONFIGURED",
+            "UNSUPPORTED_FOR_TYPE",
+            "PIPELINE_MANAGED",
+            "SYSTEM_TAG",
+            "OUT_OF_SCOPE",
+            "INSUFFICIENT_PRIVILEGES",
+            "UNKNOWN",
+        ]
+        | None
+    ) = None
     reason: str | None = None
     navigate_to: str | None = None
 
@@ -102,7 +131,14 @@ class AssetDetail(AssetSummary):
 class Dependency:
     kind: DependencyKind
     full_name: str
-    source: Literal["unity_catalog_api", "account_api", "system_table", "durable_store", "application", "fixture"]
+    source: Literal[
+        "unity_catalog_api",
+        "account_api",
+        "system_table",
+        "durable_store",
+        "application",
+        "fixture",
+    ]
     verified: bool
 
 

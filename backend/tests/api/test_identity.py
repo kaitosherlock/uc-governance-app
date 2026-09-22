@@ -29,7 +29,8 @@ def test_spoofed_email_does_not_authenticate(monkeypatch: pytest.MonkeyPatch) ->
     app.state.identity_resolver = resolver
     with TestClient(app) as client:
         response = client.get(
-            "/api/v1/me", headers={"X-Forwarded-Email": "spoof@example.test"},
+            "/api/v1/me",
+            headers={"X-Forwarded-Email": "spoof@example.test"},
         )
     assert response.status_code == 401
     resolver.resolve.assert_not_called()
@@ -47,7 +48,8 @@ def test_no_service_principal_fallback_on_failed_user_token(
     app.state.identity_resolver = resolver
     with TestClient(app) as client:
         response = client.get(
-            "/api/v1/me", headers={"x-forwarded-access-token": "synthetic-user-token"},
+            "/api/v1/me",
+            headers={"x-forwarded-access-token": "synthetic-user-token"},
         )
     assert response.status_code == 401
     assert response.json()["code"] == "UNAUTHENTICATED"
@@ -69,26 +71,40 @@ def test_connected_resolver_is_lazy_and_user_scoped(monkeypatch: pytest.MonkeyPa
     assert response.json()["code"] == "UNAUTHENTICATED"
 
 
-@pytest.mark.parametrize(("headers", "expected"), [
-    ({"X-Forwarded-Email": "alice@example.test"}, 200),
-    ({"X-Forwarded-Email": "spoof@example.test"}, 401),
-    ({"X-Forwarded-User": "wrong-user-id"}, 401),
-])
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        ({"X-Forwarded-Email": "alice@example.test"}, 200),
+        ({"X-Forwarded-Email": "spoof@example.test"}, 401),
+        ({"X-Forwarded-User": "wrong-user-id"}, 401),
+    ],
+)
 def test_forwarded_headers_cross_checked(
-    monkeypatch: pytest.MonkeyPatch, headers: dict[str, str], expected: int,
+    monkeypatch: pytest.MonkeyPatch,
+    headers: dict[str, str],
+    expected: int,
 ) -> None:
     app = connected_app(monkeypatch)
     resolver = AsyncMock()
     resolver.resolve.return_value = ResolvedUser(
-        actor=Actor(id="synthetic-user-id", display="Alice", kind=ActorKind.USER,
-                    roles=[AppRole.VIEWER], verified_by="user_token"),
+        actor=Actor(
+            id="synthetic-user-id",
+            display="Alice",
+            kind=ActorKind.USER,
+            roles=[AppRole.VIEWER],
+            verified_by="user_token",
+        ),
         email="alice@example.test",
     )
     app.state.identity_resolver = resolver
     with TestClient(app) as client:
-        response = client.get("/api/v1/me", headers={
-            "x-forwarded-access-token": "synthetic-token", **headers,
-        })
+        response = client.get(
+            "/api/v1/me",
+            headers={
+                "x-forwarded-access-token": "synthetic-token",
+                **headers,
+            },
+        )
     assert response.status_code == expected
     if expected == 401:
         assert response.json()["code"] == "IDENTITY_MISMATCH"

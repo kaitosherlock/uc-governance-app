@@ -32,42 +32,94 @@ WORKSPACE_OPERATIONS: dict[str, tuple[str, ...]] = {
     "storage_credentials": ("list", "get", "create", "update", "delete", "validate"),
     "external_locations": ("list", "get", "create", "update", "delete", "validate"),
     "connections": ("list", "get", "create", "update", "delete"),
-    "shares": ("list", "list_shares", "get", "create", "update", "delete",
-               "share_permissions", "update_permissions"),
-    "recipients": ("list", "get", "create", "update", "delete", "share_permissions",
-                   "rotate_token"),
+    "shares": (
+        "list",
+        "list_shares",
+        "get",
+        "create",
+        "update",
+        "delete",
+        "share_permissions",
+        "update_permissions",
+    ),
+    "recipients": (
+        "list",
+        "get",
+        "create",
+        "update",
+        "delete",
+        "share_permissions",
+        "rotate_token",
+    ),
     "providers": ("list", "get", "create", "update", "delete", "list_shares"),
     "workspace_bindings": ("get_bindings", "update_bindings"),
-    "quality_monitors": ("get", "create", "update", "delete", "list_refreshes",
-                         "get_refresh", "run_refresh"),
+    "quality_monitors": (
+        "get",
+        "create",
+        "update",
+        "delete",
+        "list_refreshes",
+        "get_refresh",
+        "run_refresh",
+    ),
     "serving_endpoints": ("list", "get", "get_permissions"),
-    "statement_execution": ("execute_statement", "get_statement", "cancel_execution",
-                            "get_statement_result_chunk_n"),
+    "statement_execution": (
+        "execute_statement",
+        "get_statement",
+        "cancel_execution",
+        "get_statement_result_chunk_n",
+    ),
     "users": ("list", "get"),
     "groups": ("list", "get"),
     "service_principals": ("list", "get"),
     "current_user": ("me",),
     "entity_tag_assignments": ("list", "get", "create", "update", "delete"),
-    "tag_policies": ("list_tag_policies", "get_tag_policy", "create_tag_policy",
-                     "update_tag_policy", "delete_tag_policy"),
-    "policies": ("list_policies", "get_policy", "create_policy", "update_policy",
-                 "delete_policy"),
-    "rfa": ("get_access_request_destinations", "update_access_request_destinations",
-            "batch_create_access_requests", "approve_access_request", "execute_access_request"),
-    "external_lineage": ("list_external_lineage_relationships",
-                         "create_external_lineage_relationship",
-                         "update_external_lineage_relationship",
-                         "delete_external_lineage_relationship"),
-    "external_metadata": ("list_external_metadata", "get_external_metadata",
-                          "create_external_metadata", "update_external_metadata",
-                          "delete_external_metadata"),
+    "tag_policies": (
+        "list_tag_policies",
+        "get_tag_policy",
+        "create_tag_policy",
+        "update_tag_policy",
+        "delete_tag_policy",
+    ),
+    "policies": ("list_policies", "get_policy", "create_policy", "update_policy", "delete_policy"),
+    "rfa": (
+        "get_access_request_destinations",
+        "update_access_request_destinations",
+        "batch_create_access_requests",
+        "approve_access_request",
+        "execute_access_request",
+    ),
+    "external_lineage": (
+        "list_external_lineage_relationships",
+        "create_external_lineage_relationship",
+        "update_external_lineage_relationship",
+        "delete_external_lineage_relationship",
+    ),
+    "external_metadata": (
+        "list_external_metadata",
+        "get_external_metadata",
+        "create_external_metadata",
+        "update_external_metadata",
+        "delete_external_metadata",
+    ),
     "clean_rooms": ("list", "get"),
-    "credentials": ("list_credentials", "get_credential", "create_credential",
-                    "update_credential", "delete_credential", "validate_credential"),
+    "credentials": (
+        "list_credentials",
+        "get_credential",
+        "create_credential",
+        "update_credential",
+        "delete_credential",
+        "validate_credential",
+    ),
     "temporary_table_credentials": ("generate_temporary_table_credentials",),
     "resource_quotas": ("list_quotas", "get_quota"),
-    "data_classification": ("get_catalog_config", "create_catalog_config",
-                            "update_catalog_config", "delete_catalog_config", "get_results"),
+    "data_classification": (
+        "get_catalog_config",
+        "create_catalog_config",
+        "update_catalog_config",
+        "delete_catalog_config",
+        "get_results",
+    ),
     "data_quality": ("get_monitor", "list_monitor", "get_refresh", "list_refresh"),
     "consumer_listings": ("list", "get"),
     "lineage": ("get_table_lineage", "get_column_lineage"),
@@ -121,7 +173,9 @@ def runtime_surfaces() -> list[dict[str, Any]]:
         for service, methods in CANDIDATES[client.__name__].items():
             cls = service_class(client, service)
             row: dict[str, Any] = {
-                "client": client.__name__, "service": service, "present": cls is not None,
+                "client": client.__name__,
+                "service": service,
+                "present": cls is not None,
                 "service_class": f"{cls.__module__}.{cls.__qualname__}" if cls else None,
                 "methods": {},
             }
@@ -133,7 +187,8 @@ def runtime_surfaces() -> list[dict[str, Any]]:
                     hints = get_type_hints(method)
                     details.update(
                         parameters=[p for p in signature.parameters if p not in ("self", "cls")],
-                        signature=str(signature), return_annotation=str(hints.get("return")),
+                        signature=str(signature),
+                        return_annotation=str(hints.get("return")),
                         return_annotation_declared="return" in hints,
                         return_dtos=dto_fields(hints.get("return")),
                     )
@@ -146,14 +201,16 @@ class SourceIndex:
     """Read declarations only. No exec, imports, credentials, or SDK initialization."""
 
     def __init__(self) -> None:
-        self.root = Path(distribution("databricks-sdk").locate_file(""))
+        self.root = Path(str(distribution("databricks-sdk").locate_file("")))
         self.modules: dict[str, ast.Module] = {}
 
     def module(self, name: str) -> ast.Module:
         if name not in self.modules:
             path = self.root.joinpath(*name.split("."))
-            path = path.with_suffix(".py") if path.with_suffix(".py").is_file() else (
-                path / "__init__.py"
+            path = (
+                path.with_suffix(".py")
+                if path.with_suffix(".py").is_file()
+                else (path / "__init__.py")
             )
             self.modules[name] = ast.parse(path.read_text(encoding="utf-8"))
         return self.modules[name]
@@ -164,9 +221,8 @@ class SourceIndex:
                 return module, node
             if isinstance(node, ast.ImportFrom) and node.module and not node.level:
                 for alias in node.names:
-                    if (
-                        (alias.asname or alias.name) == name
-                        and node.module.startswith("databricks")
+                    if (alias.asname or alias.name) == name and node.module.startswith(
+                        "databricks"
                     ):
                         return self.resolve(node.module, alias.name)
                     prefix, dot, suffix = name.partition(".")
@@ -175,7 +231,10 @@ class SourceIndex:
         return None
 
     def method(
-        self, module: str, cls: ast.ClassDef, name: str,
+        self,
+        module: str,
+        cls: ast.ClassDef,
+        name: str,
     ) -> tuple[str, ast.FunctionDef] | None:
         for node in cls.body:
             if isinstance(node, ast.FunctionDef) and node.name == name:
@@ -189,7 +248,10 @@ class SourceIndex:
         return None
 
     def dtos(
-        self, module: str, annotation: ast.expr | None, seen: set[str] | None = None,
+        self,
+        module: str,
+        annotation: ast.expr | None,
+        seen: set[str] | None = None,
     ) -> dict[str, list[str]]:
         seen = set() if seen is None else seen
         result: dict[str, list[str]] = {}
@@ -223,14 +285,19 @@ def source_surfaces() -> list[dict[str, Any]]:
         assert client_cls is not None
         for service, methods in services.items():
             prop = index.method(*client_cls, service)
-            cls = index.resolve(prop[0], ast.unparse(prop[1].returns)) if (
-                prop and prop[1].returns
-            ) else None
+            cls = (
+                index.resolve(prop[0], ast.unparse(prop[1].returns))
+                if (prop and prop[1].returns)
+                else None
+            )
             if prop is not None and cls is None:
                 raise TypeError(f"Unresolved source service: {client}.{service}")
             row: dict[str, Any] = {
-                "client": client, "service": service, "present": prop is not None,
-                "service_class": f"{cls[0]}.{cls[1].name}" if cls else None, "methods": {},
+                "client": client,
+                "service": service,
+                "present": prop is not None,
+                "service_class": f"{cls[0]}.{cls[1].name}" if cls else None,
+                "methods": {},
             }
             for name in methods:
                 method = index.method(*cls, name) if cls else None
@@ -260,7 +327,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", type=Path, help="Also write the JSON report to this path")
     parser.add_argument(
-        "--source-only", action="store_true", help="AST evidence, not runtime proof",
+        "--source-only",
+        action="store_true",
+        help="AST evidence, not runtime proof",
     )
     args = parser.parse_args()
     surfaces = source_surfaces() if args.source_only else runtime_surfaces()
@@ -273,9 +342,12 @@ def main() -> None:
             "No clients constructed or SDK methods called; no network or credentials used.",
             "Privileges, OAuth scopes, GA/Preview and runtime availability are not verified.",
             "Missing annotations do not establish an empty DTO or a void response.",
-        ] + (["Static declarations only; runtime imports/signatures remain unverified."] if (
-            args.source_only
-        ) else []),
+        ]
+        + (
+            ["Static declarations only; runtime imports/signatures remain unverified."]
+            if (args.source_only)
+            else []
+        ),
         "surface_counts": {
             "present": sum(row["present"] for row in surfaces),
             "absent": sum(not row["present"] for row in surfaces),

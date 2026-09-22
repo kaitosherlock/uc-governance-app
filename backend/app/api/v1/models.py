@@ -6,10 +6,26 @@ from typing import Annotated, Generic, Literal, TypeVar
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field
 
+from app.domain.enums import (
+    ActionName,
+    AttachmentSource,
+    DependencyKind,
+    GrantSourceType,
+    ManagedStatus,
+    ObjectKind,
+    PrincipalKind,
+    PrincipalScope,
+    PrivilegeCategory,
+    SecurableType,
+    TagKind,
+)
+
 
 class ContractModel(BaseModel):
     model_config = ConfigDict(
-        populate_by_name=True, serialize_by_alias=True, hide_input_in_errors=True,
+        populate_by_name=True,
+        serialize_by_alias=True,
+        hide_input_in_errors=True,
     )
 
 
@@ -193,14 +209,25 @@ class CapabilitiesResponse(SuccessResponse[list[Capability]]):
     pass
 
 
-# Phase 1 read DTOs.
-from app.domain.enums import (SecurableType, ObjectKind, ManagedStatus, ActionName, TagKind, AttachmentSource, DependencyKind, PrincipalKind, PrincipalScope, PrivilegeCategory, GrantSourceType)
-
-
 class AllowedAction(ContractModel):
     action: ActionName
     allowed: bool
-    reason_code: Literal['INHERITED_FROM_PARENT', 'ROLE_INSUFFICIENT', 'MODE_READ_ONLY', 'NOT_IMPLEMENTED', 'NOT_CONFIGURED', 'UNSUPPORTED_FOR_TYPE', 'PIPELINE_MANAGED', 'SYSTEM_TAG', 'OUT_OF_SCOPE', 'INSUFFICIENT_PRIVILEGES', 'UNKNOWN'] | None = None
+    reason_code: (
+        Literal[
+            "INHERITED_FROM_PARENT",
+            "ROLE_INSUFFICIENT",
+            "MODE_READ_ONLY",
+            "NOT_IMPLEMENTED",
+            "NOT_CONFIGURED",
+            "UNSUPPORTED_FOR_TYPE",
+            "PIPELINE_MANAGED",
+            "SYSTEM_TAG",
+            "OUT_OF_SCOPE",
+            "INSUFFICIENT_PRIVILEGES",
+            "UNKNOWN",
+        ]
+        | None
+    ) = None
     reason: str | None = None
     navigate_to: str | None = None
 

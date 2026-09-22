@@ -22,8 +22,11 @@ class FixtureIdentityResolver:
         email = access_token + "@example.test"
         return ResolvedUser(
             actor=Actor(
-                id=user_id, display=email, kind=ActorKind.USER,
-                roles=list(roles), verified_by="fixture",
+                id=user_id,
+                display=email,
+                kind=ActorKind.USER,
+                roles=list(roles),
+                verified_by="fixture",
             ),
             email=email,
         )

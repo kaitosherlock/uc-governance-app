@@ -22,9 +22,11 @@ class CorrelationMiddleware:
             return
         supplied = Headers(scope=scope).get("x-request-id", "")
         # Reject controls/oversized values to keep headers and logs safe.
-        request_id = supplied if (
-            supplied and len(supplied) <= 200 and all(32 <= ord(c) < 127 for c in supplied)
-        ) else str(uuid4())
+        request_id = (
+            supplied
+            if (supplied and len(supplied) <= 200 and all(32 <= ord(c) < 127 for c in supplied))
+            else str(uuid4())
+        )
         token = correlation_id.set(request_id)
         scope.setdefault("state", {})["correlation_id"] = request_id
         started = False
@@ -51,9 +53,13 @@ def origin_tuple(value: str) -> tuple[str, str, int] | None:
     try:
         parsed = urlsplit(value)
         if (
-            parsed.scheme not in {"http", "https"} or not parsed.hostname
-            or parsed.username is not None or parsed.password is not None
-            or parsed.path not in {"", "/"} or parsed.query or parsed.fragment
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
         ):
             return None
         port = parsed.port or (443 if parsed.scheme == "https" else 80)

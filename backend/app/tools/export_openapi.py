@@ -9,7 +9,8 @@ from app.main import create_app
 def main() -> None:
     destination = Path(__file__).resolve().parents[2] / "openapi.json"
     destination.write_text(
-        json.dumps(create_app().openapi(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
+        json.dumps(create_app().openapi(), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
     print(f"Exported {destination}")
 

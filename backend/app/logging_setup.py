@@ -69,9 +69,7 @@ class RedactionFilter(logging.Filter):
             record.exc_text = self.redactor.text(formatted_exception)
             record.exc_info = None
         for key, value in list(vars(record).items()):
-            record.__dict__[key] = (
-                REDACTED if is_secret_name(key) else self.redactor.value(value)
-            )
+            record.__dict__[key] = REDACTED if is_secret_name(key) else self.redactor.value(value)
         record.correlation_id = self.redactor.text(correlation_id.get())
         return True
 

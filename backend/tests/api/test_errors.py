@@ -22,26 +22,32 @@ def test_unknown_path_has_error_envelope(client: TestClient) -> None:
     response = client.get("/api/v1/no-such-route", headers={"X-Request-Id": "missing-route"})
     assert response.status_code == 404
     assert response.json() == {
-        "success": False, "code": "NOT_FOUND",
+        "success": False,
+        "code": "NOT_FOUND",
         "message": "Not found or not visible to the application.",
-        "correlation_id": "missing-route", "next_steps": [], "errors": [],
+        "correlation_id": "missing-route",
+        "next_steps": [],
+        "errors": [],
     }
     assert response.headers["X-Request-Id"] == "missing-route"
 
 
-@pytest.mark.parametrize(("error", "status", "code"), [
-    (ValidationFailed(), 400, "VALIDATION_FAILED"),
-    (Unauthenticated(), 401, "UNAUTHENTICATED"),
-    (IdentityMismatch(), 401, "IDENTITY_MISMATCH"),
-    (ForbiddenRole(), 403, "FORBIDDEN_ROLE"),
-    (ForbiddenScope(), 403, "FORBIDDEN_SCOPE"),
-    (ModeReadOnly(), 403, "MODE_READ_ONLY"),
-    (NotFound(), 404, "NOT_FOUND"),
-    (NotConfigured(), 503, "NOT_CONFIGURED"),
-    (NotImplementedYet(), 501, "NOT_IMPLEMENTED"),
-    (UpstreamUnavailable(), 503, "UPSTREAM_UNAVAILABLE"),
-    (RateLimited(), 429, "RATE_LIMITED"),
-])
+@pytest.mark.parametrize(
+    ("error", "status", "code"),
+    [
+        (ValidationFailed(), 400, "VALIDATION_FAILED"),
+        (Unauthenticated(), 401, "UNAUTHENTICATED"),
+        (IdentityMismatch(), 401, "IDENTITY_MISMATCH"),
+        (ForbiddenRole(), 403, "FORBIDDEN_ROLE"),
+        (ForbiddenScope(), 403, "FORBIDDEN_SCOPE"),
+        (ModeReadOnly(), 403, "MODE_READ_ONLY"),
+        (NotFound(), 404, "NOT_FOUND"),
+        (NotConfigured(), 503, "NOT_CONFIGURED"),
+        (NotImplementedYet(), 501, "NOT_IMPLEMENTED"),
+        (UpstreamUnavailable(), 503, "UPSTREAM_UNAVAILABLE"),
+        (RateLimited(), 429, "RATE_LIMITED"),
+    ],
+)
 def test_app_error_status(app: FastAPI, error: AppError, status: int, code: str) -> None:
     @app.get("/test-error")
     def fail() -> None:
@@ -62,7 +68,8 @@ def test_unhandled_failure_is_generic_and_correlated(app: FastAPI) -> None:
 
     with TestClient(app, raise_server_exceptions=False) as client:
         response = client.get(
-            "/test-internal-error", headers={"X-Request-Id": "internal-request"},
+            "/test-internal-error",
+            headers={"X-Request-Id": "internal-request"},
         )
     assert response.status_code == 500
     assert response.json()["code"] == "INTERNAL_ERROR"

@@ -21,3 +21,6 @@ test-results/
 # Local configuration. Never commit real credentials.
 .env
 .env.local
+
+# pytest tmp_path root created by the backend suite; unreadable and never shippable
+.pytest-temp/

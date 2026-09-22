@@ -26,8 +26,12 @@ logger = logging.getLogger(__name__)
 def error_response(error: AppError, request_id: str | None = None) -> JSONResponse:
     request_id = request_id or correlation_id.get()
     envelope = ErrorResponse(
-        success=False, code=error.code, message=error.message, correlation_id=request_id,
-        next_steps=error.next_steps, errors=error.errors,
+        success=False,
+        code=error.code,
+        message=error.message,
+        correlation_id=request_id,
+        next_steps=error.next_steps,
+        errors=error.errors,
     )
     return JSONResponse(
         status_code=error.http_status,
@@ -44,10 +48,14 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
 async def validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, RequestValidationError)
     # Pydantic messages, input and ctx can contain arbitrary user values; omit them.
-    fields = [FieldError(
-        field=".".join(str(part) for part in error["loc"]),
-        code="INVALID_FIELD", message="Invalid value for this field.",
-    ) for error in exc.errors()]
+    fields = [
+        FieldError(
+            field=".".join(str(part) for part in error["loc"]),
+            code="INVALID_FIELD",
+            message="Invalid value for this field.",
+        )
+        for error in exc.errors()
+    ]
     return error_response(ValidationFailed(errors=fields), request.state.correlation_id)
 
 

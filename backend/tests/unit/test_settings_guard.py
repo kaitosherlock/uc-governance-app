@@ -7,7 +7,9 @@ from pydantic import ValidationError
 @pytest.mark.parametrize("name", ["DATABRICKS_APP_PORT", "DATABRICKS_CLIENT_ID"])
 @pytest.mark.parametrize("value", ["", "synthetic"])
 def test_fixture_guard_rejects_presence(
-    monkeypatch: pytest.MonkeyPatch, name: str, value: str,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    value: str,
 ) -> None:
     monkeypatch.setenv(name, value)
     with pytest.raises(RuntimeError, match="Fixture mode cannot run in a deployed app"):

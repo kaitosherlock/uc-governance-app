@@ -27,45 +27,81 @@ def json_schema(value):
 
 
 def validate_contract(instance, name: str) -> None:
-    schema = json_schema({
-        "$ref": f"#/components/schemas/{name}", "components": CONTRACT["components"],
-    })
+    schema = json_schema(
+        {
+            "$ref": f"#/components/schemas/{name}",
+            "components": CONTRACT["components"],
+        }
+    )
     Draft4Validator(schema, format_checker=FormatChecker()).validate(instance)
 
 
-@pytest.mark.parametrize(("path", "schema"), [
-    ("context", "ContextResponse"), ("me", "IdentityResponse"),
-    ("capabilities", "CapabilitiesResponse"), ("missing", "ErrorResponse"),
-])
+@pytest.mark.parametrize(
+    ("path", "schema"),
+    [
+        ("context", "ContextResponse"),
+        ("me", "IdentityResponse"),
+        ("capabilities", "CapabilitiesResponse"),
+        ("missing", "ErrorResponse"),
+    ],
+)
 def test_endpoint_response_matches_frozen_schema(
-    client: TestClient, path: str, schema: str,
+    client: TestClient,
+    path: str,
+    schema: str,
 ) -> None:
     validate_contract(client.get(f"/api/v1/{path}").json(), schema)
 
 
-@pytest.mark.parametrize("name", [
-    "ErrorCode", "DataSource", "Completeness", "AppMode", "AppRole", "ActorKind",
-    "CapabilityStatusValue",
-])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ErrorCode",
+        "DataSource",
+        "Completeness",
+        "AppMode",
+        "AppRole",
+        "ActorKind",
+        "CapabilityStatusValue",
+    ],
+)
 def test_enum_parity(name: str) -> None:
     assert {member.value for member in getattr(models, name)} == set(SCHEMAS[name]["enum"])
 
 
-@pytest.mark.parametrize("name", [
-    "Meta", "Page", "FieldError", "ErrorResponse", "Context", "ContextResponse", "Actor",
-    "Executor", "Identity", "IdentityResponse", "Capability", "CapabilitiesResponse",
-])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Meta",
+        "Page",
+        "FieldError",
+        "ErrorResponse",
+        "Context",
+        "ContextResponse",
+        "Actor",
+        "Executor",
+        "Identity",
+        "IdentityResponse",
+        "Capability",
+        "CapabilitiesResponse",
+    ],
+)
 def test_model_field_and_required_parity(name: str) -> None:
     actual = getattr(models, name).model_json_schema(by_alias=True)
     assert set(actual["properties"]) == set(SCHEMAS[name]["properties"])
     assert set(actual["required"]) == set(SCHEMAS[name]["required"])
 
 
-@pytest.mark.parametrize("filename", [
-    "ContextResponse.fixture.json", "IdentityResponse.steward.json",
-    "ErrorResponse.forbidden-role.json", "ErrorResponse.not-configured.json",
-    "ErrorResponse.validation-failed.json",
-])
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "ContextResponse.fixture.json",
+        "IdentityResponse.steward.json",
+        "ErrorResponse.forbidden-role.json",
+        "ErrorResponse.not-configured.json",
+        "ErrorResponse.validation-failed.json",
+    ],
+)
 def test_frozen_examples_round_trip(filename: str) -> None:
     example = ROOT / "shared/contracts/examples" / filename
     instance = json.loads(example.read_text(encoding="utf-8"))
@@ -78,8 +114,11 @@ def test_frozen_examples_round_trip(filename: str) -> None:
 
 def test_utc_serialization_and_nullable_required_fields() -> None:
     meta = models.Meta(
-        source=models.DataSource.APPLICATION, observed_at="2026-09-21T17:00:00+07:00",
-        completeness=models.Completeness.COMPLETE, limitations=[], correlation_id="synthetic-id",
+        source=models.DataSource.APPLICATION,
+        observed_at="2026-09-21T17:00:00+07:00",
+        completeness=models.Completeness.COMPLETE,
+        limitations=[],
+        correlation_id="synthetic-id",
     )
     assert meta.model_dump(mode="json")["observed_at"] == "2026-09-21T10:00:00Z"
     assert models.Page(page_size=50, next_page_token=None).model_dump()["next_page_token"] is None

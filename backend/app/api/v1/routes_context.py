@@ -24,10 +24,13 @@ from app.config.settings import Mode, Settings
 from app.correlation import correlation_id
 from app.errors import ForbiddenRole
 
-router = APIRouter(tags=["context"], responses={
-    401: {"model": ErrorResponse, "description": "Unauthenticated or identity mismatch"},
-    500: {"model": ErrorResponse, "description": "Internal error"},
-})
+router = APIRouter(
+    tags=["context"],
+    responses={
+        401: {"model": ErrorResponse, "description": "Unauthenticated or identity mismatch"},
+        500: {"model": ErrorResponse, "description": "Internal error"},
+    },
+)
 CurrentIdentity = Annotated[Identity, Depends(current_identity)]
 
 
@@ -35,7 +38,9 @@ def make_meta(settings: Settings) -> Meta:
     fixture = settings.mode == Mode.FIXTURE
     return Meta(
         source=DataSource.FIXTURE if fixture else DataSource.APPLICATION,
-        observed_at=datetime.now(UTC), scope=None, completeness=Completeness.COMPLETE,
+        observed_at=datetime.now(UTC),
+        scope=None,
+        completeness=Completeness.COMPLETE,
         limitations=["All data on this screen is synthetic."] if fixture else [],
         correlation_id=correlation_id.get(),
     )
@@ -43,27 +48,39 @@ def make_meta(settings: Settings) -> Meta:
 
 def authorize_read(identity: Identity, action: str, settings: Settings) -> None:
     decision = decide(
-        identity, action, Target(), managed_catalogs=settings.managed_catalogs, mode=settings.mode,
+        identity,
+        action,
+        Target(),
+        managed_catalogs=settings.managed_catalogs,
+        mode=settings.mode,
     )
     if not decision.allowed:
         raise ForbiddenRole(decision.reason)
 
 
-@router.get("/context", response_model=ContextResponse, operation_id="getContext",
-            summary="Workspace, environment, mode, and configured resources")
+@router.get(
+    "/context",
+    response_model=ContextResponse,
+    operation_id="getContext",
+    summary="Workspace, environment, mode, and configured resources",
+)
 async def get_context(request: Request, identity: CurrentIdentity) -> ContextResponse:
     settings: Settings = request.app.state.settings
     authorize_read(identity, "context.read", settings)
     data = Context(
         mode=AppMode(settings.mode.value),
         mode_label=(
-            "Demo — synthetic data" if settings.mode == Mode.FIXTURE else
-            "Read-only" if settings.mode == Mode.CONNECTED_READONLY else "Editing enabled"
+            "Demo — synthetic data"
+            if settings.mode == Mode.FIXTURE
+            else "Read-only"
+            if settings.mode == Mode.CONNECTED_READONLY
+            else "Editing enabled"
         ),
         environment_label=settings.environment_label,
         workspace_host=(
             "https://demo.example.test"
-            if settings.mode == Mode.FIXTURE else settings.workspace_host
+            if settings.mode == Mode.FIXTURE
+            else settings.workspace_host
         ),
         workspace_id=None if settings.mode == Mode.FIXTURE else settings.workspace_id,
         managed_catalogs=settings.managed_catalogs,
@@ -76,19 +93,29 @@ async def get_context(request: Request, identity: CurrentIdentity) -> ContextRes
     return ContextResponse(success=True, data=data, meta=make_meta(settings))
 
 
-@router.get("/me", response_model=IdentityResponse, operation_id="getMe",
-            summary="Authenticated actor and default execution identity")
+@router.get(
+    "/me",
+    response_model=IdentityResponse,
+    operation_id="getMe",
+    summary="Authenticated actor and default execution identity",
+)
 async def get_me(request: Request, identity: CurrentIdentity) -> IdentityResponse:
     settings: Settings = request.app.state.settings
     authorize_read(identity, "identity.read", settings)
     return IdentityResponse(success=True, data=identity, meta=make_meta(settings))
 
 
-@router.get("/capabilities", response_model=CapabilitiesResponse, operation_id="listCapabilities",
-            summary="Implementation coverage and runtime availability of every capability")
+@router.get(
+    "/capabilities",
+    response_model=CapabilitiesResponse,
+    operation_id="listCapabilities",
+    summary="Implementation coverage and runtime availability of every capability",
+)
 async def list_capabilities(request: Request, identity: CurrentIdentity) -> CapabilitiesResponse:
     settings: Settings = request.app.state.settings
     authorize_read(identity, "capabilities.read", settings)
     return CapabilitiesResponse(
-        success=True, data=[probe(row, settings) for row in REGISTRY], meta=make_meta(settings),
+        success=True,
+        data=[probe(row, settings) for row in REGISTRY],
+        meta=make_meta(settings),
     )
