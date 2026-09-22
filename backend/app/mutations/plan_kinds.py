@@ -7,7 +7,9 @@ state.  This module only turns a kind-specific request into honest reads/writes.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Protocol
 
 from app.adapters.protocols import (
@@ -20,8 +22,17 @@ from app.adapters.protocols import (
 )
 from app.api import mappers
 from app.api.v1 import models as w
-from app.domain.enums import ActionName, GrantSourceType, TagKind
-from app.domain.models import AllowedAction, AssetDetail, Grant, Tag, TagPolicy
+from app.domain.enums import ActionName, GrantSourceType, ObjectKind, SecurableType, TagKind
+from app.domain.models import (
+    AbacPolicy,
+    AllowedAction,
+    AssetDetail,
+    AssetRef,
+    AssetSummary,
+    Grant,
+    Tag,
+    TagPolicy,
+)
 from app.domain.names import access_route, parts
 from app.domain.privileges import APPLICABILITY
 from app.domain.reads import ReadPolicy
@@ -51,6 +62,22 @@ class MutationAdapter(AssetReader, GrantReader, GrantWriter, PrincipalReader, Ta
         assign: tuple[Tag, ...],
         remove: tuple[str, ...],
     ) -> None: ...
+
+    def list_abac_policies(
+        self, scope_full_name: str | None, page_size: int, page_token: str | None
+    ) -> tuple[list[AbacPolicy], str | None]: ...
+
+    def get_abac_policy(self, policy_id: str) -> AbacPolicy: ...
+
+    def abac_policy_impact_for(
+        self, policy: AbacPolicy, page_size: int
+    ) -> tuple[list[AssetSummary], tuple[str, ...]]: ...
+
+    def create_abac_policy(self, value: AbacPolicy) -> None: ...
+
+    def update_abac_policy(self, policy_id: str, value: AbacPolicy) -> None: ...
+
+    def delete_abac_policy(self, policy_id: str) -> None: ...
 
 
 def _field_error(field: str, code: str, message: str) -> ValidationFailed:
@@ -94,6 +121,24 @@ class _TagChange:
 class _TagChanges:
     column: str | None
     tags: tuple[_TagChange, ...]
+
+
+@dataclass(frozen=True)
+class _PolicyChanges:
+    policy_id: str
+    name: str
+    policy_type: str
+    when_condition: str
+    to_principals: tuple[str, ...]
+    except_principals: tuple[str, ...]
+    function_full_name: str
+    match_columns: tuple[str, ...]
+
+
+_HAS_TAG = re.compile(r"^has_tag\('([A-Za-z0-9_.-]+)'\)$")
+_HAS_TAG_VALUE = re.compile(r"^has_tag_value\('([A-Za-z0-9_.-]+)',\s*'([^']+)'\)$")
+_POLICY_SCOPE_TYPES = frozenset({"CATALOG", "SCHEMA", "TABLE"})
+_FIXTURE_FUNCTION_SIGNATURES = {"shared_ref.governance.normalize_id": "row_filter"}
 
 
 class RegisteredPlanKind(PlanKindHandler):
@@ -340,6 +385,211 @@ class FixturePlanKindHandler(PlanKindHandler):
             )
         return kind
 
+    def _policy_changes(
+        self, changes: dict[str, object], target: w.AssetRef, *, allow_existing: bool = False
+    ) -> _PolicyChanges:
+        if target.securable_type.value not in _POLICY_SCOPE_TYPES:
+            raise _field_error(
+                "targets",
+                "UNSUPPORTED_SCOPE",
+                "ABAC row-filter and column-mask policies support CATALOG, SCHEMA, or TABLE scope.",
+            )
+        if self.kind == w.PlanKind.DELETE_ABAC_POLICY:
+            if set(changes) != {"policy_id"}:
+                raise _field_error(
+                    "changes", "INVALID", "Delete policy changes require only policy_id."
+                )
+            policy_id = _string(changes.get("policy_id"), "changes.policy_id")
+            current = self.adapter.get_abac_policy(policy_id)
+            if current.scope.full_name != target.full_name:
+                raise _field_error(
+                    "changes.policy_id",
+                    "SCOPE_MISMATCH",
+                    "The policy id does not belong to the requested policy scope.",
+                )
+            return _PolicyChanges(
+                policy_id=current.id,
+                name=current.name,
+                policy_type=current.policy_type,
+                when_condition=current.when_condition,
+                to_principals=current.to_principals,
+                except_principals=current.except_principals,
+                function_full_name=current.function_full_name,
+                match_columns=current.match_columns,
+            )
+        required = {
+            "name",
+            "policy_type",
+            "when_condition",
+            "to_principals",
+            "except_principals",
+            "function_full_name",
+            "match_columns",
+        }
+        allowed = required | {"policy_id"}
+        if not required.issubset(changes) or not set(changes).issubset(allowed):
+            raise _field_error(
+                "changes",
+                "INVALID",
+                "Policy changes require name, policy_type, when_condition, principals, "
+                "function_full_name and match_columns.",
+            )
+        name = _string(changes.get("name"), "changes.name")
+        policy_type = _string(changes.get("policy_type"), "changes.policy_type")
+        if policy_type not in {"row_filter", "column_mask"}:
+            raise _field_error(
+                "changes.policy_type",
+                "UNSUPPORTED_POLICY_TYPE",
+                "Only row_filter and column_mask policy types are supported by this contract.",
+            )
+        condition = _string(changes.get("when_condition"), "changes.when_condition")
+        match = _HAS_TAG.fullmatch(condition) or _HAS_TAG_VALUE.fullmatch(condition)
+        if match is None:
+            raise _field_error(
+                "changes.when_condition",
+                "UNSUPPORTED_PREDICATE",
+                "Only has_tag('key') and has_tag_value('key', 'value') predicates can be "
+                "approximated from visible metadata.",
+            )
+        tag_key = match.group(1)
+        governed = self._policies().get(tag_key)
+        if governed is None:
+            raise _field_error(
+                "changes.when_condition",
+                "GOVERNED_TAG_REQUIRED",
+                f"Policy predicate tag '{tag_key}' is not a visible governed tag policy.",
+            )
+        function_name = _string(changes.get("function_full_name"), "changes.function_full_name")
+        self.adapter.get_asset("FUNCTION", function_name)
+        signature = _FIXTURE_FUNCTION_SIGNATURES.get(function_name)
+        if signature != policy_type:
+            raise _field_error(
+                "changes.function_full_name",
+                "UNSUPPORTED_SIGNATURE",
+                f"Function '{function_name}' does not have the supported {policy_type} signature.",
+            )
+
+        def principals(field: str, required: bool) -> tuple[str, ...]:
+            raw = changes.get(field)
+            if not isinstance(raw, list) or (required and not raw) or any(
+                not isinstance(item, str) for item in raw
+            ):
+                wording = "at least one principal" if required else "only principal names"
+                raise _field_error(field, "INVALID", f"{field} must contain {wording}.")
+            values = tuple(dict.fromkeys(raw))
+            for principal in values:
+                self._principal(principal, field)
+            return values
+
+        included = principals("to_principals", True)
+        excluded = principals("except_principals", False)
+        overlap = set(included).intersection(excluded)
+        if overlap:
+            raise _field_error(
+                "changes.except_principals",
+                "CONFLICTING_PRINCIPAL",
+                f"A principal cannot be both included and excluded: {sorted(overlap)[0]!r}.",
+            )
+        raw_columns = changes.get("match_columns")
+        if (
+            not isinstance(raw_columns, list)
+            or not raw_columns
+            or any(not isinstance(value, str) or not value.strip() for value in raw_columns)
+        ):
+            raise _field_error(
+                "changes.match_columns",
+                "INVALID",
+                "match_columns must contain at least one non-empty alias.",
+            )
+        raw_policy_id = changes.get("policy_id")
+        if self.kind == w.PlanKind.CREATE_ABAC_POLICY:
+            if raw_policy_id is not None:
+                raise _field_error(
+                    "changes.policy_id", "INVALID", "Create must not supply policy_id."
+                )
+            digest = sha256(f"{target.full_name}\0{name}".encode()).hexdigest()[:16]
+            resolved_id = f"fixture-policy-{digest}"
+            existing, token = self.adapter.list_abac_policies(target.full_name, 200, None)
+            if token:
+                raise _field_error(
+                    "changes.name", "UNKNOWN", "Policy listing is incomplete; retry later."
+                )
+            if not allow_existing and any(value.name == name for value in existing):
+                raise _field_error(
+                    "changes.name",
+                    "CONFLICT",
+                    f"Policy name '{name}' is already used on scope '{target.full_name}'.",
+                )
+        else:
+            resolved_id = _string(raw_policy_id, "changes.policy_id")
+            current = self.adapter.get_abac_policy(resolved_id)
+            if current.scope.full_name != target.full_name:
+                raise _field_error(
+                    "changes.policy_id",
+                    "SCOPE_MISMATCH",
+                    "The policy id does not belong to the requested policy scope.",
+                )
+        return _PolicyChanges(
+            policy_id=resolved_id,
+            name=name,
+            policy_type=policy_type,
+            when_condition=condition,
+            to_principals=included,
+            except_principals=excluded,
+            function_full_name=function_name,
+            match_columns=tuple(dict.fromkeys(raw_columns)),
+        )
+
+    @staticmethod
+    def _policy_value(
+        target: w.AssetRef, value: _PolicyChanges, prior: AbacPolicy | None
+    ) -> AbacPolicy:
+        scope = AssetRef(
+            securable_type=SecurableType(target.securable_type.value),
+            full_name=target.full_name,
+            kind=ObjectKind(target.securable_type.value.lower()),
+            display_name=target.full_name.rsplit(".", maxsplit=1)[-1],
+        )
+        return AbacPolicy(
+            id=value.policy_id,
+            name=value.name,
+            policy_type=value.policy_type,  # type: ignore[arg-type]
+            scope=scope,
+            when_condition=value.when_condition,
+            to_principals=value.to_principals,
+            except_principals=value.except_principals,
+            function_full_name=value.function_full_name,
+            match_columns=value.match_columns,
+            owner=prior.owner if prior else None,
+            created_at=prior.created_at if prior else None,
+            updated_at=prior.updated_at if prior else None,
+            allowed_actions=(),
+        )
+
+    def _policy_impact(
+        self, policy: AbacPolicy, delete: bool = False
+    ) -> tuple[list[str], list[str]]:
+        assets, unknown = self.adapter.abac_policy_impact_for(policy, 200)
+        known = [
+            (
+                f"Visible metadata predicate was evaluated for `{asset.full_name}`; this is an "
+                "application approximation, not evaluated by Databricks."
+            )
+            for asset in assets
+        ]
+        if not known:
+            known.append(
+                "No visible assets matched the supported metadata predicate during this "
+                "approximation."
+            )
+        if delete:
+            known.insert(
+                0,
+                f"Removing `{policy.name}` may widen access to rows or columns in its scope; "
+                "Databricks has not evaluated this preview.",
+            )
+        return known, list(unknown)
+
     @staticmethod
     def _tag_impact(key: str, verb: str) -> str:
         return (
@@ -368,6 +618,29 @@ class FixturePlanKindHandler(PlanKindHandler):
         )
 
     def _state(self, target: w.AssetRef) -> object:
+        if self.kind in {
+            w.PlanKind.CREATE_ABAC_POLICY,
+            w.PlanKind.UPDATE_ABAC_POLICY,
+            w.PlanKind.DELETE_ABAC_POLICY,
+        }:
+            values, token = self.adapter.list_abac_policies(target.full_name, 200, None)
+            return {
+                "scope": (target.securable_type.value, target.full_name),
+                "complete": token is None,
+                "policies": [
+                    {
+                        "id": value.id,
+                        "name": value.name,
+                        "policy_type": value.policy_type,
+                        "when_condition": value.when_condition,
+                        "to_principals": value.to_principals,
+                        "except_principals": value.except_principals,
+                        "function_full_name": value.function_full_name,
+                        "match_columns": value.match_columns,
+                    }
+                    for value in sorted(values, key=lambda item: item.id)
+                ],
+            }
         asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
         direct, _ = self.adapter.direct_grants(
             target.securable_type.value, target.full_name, 200, None
@@ -674,6 +947,64 @@ class FixturePlanKindHandler(PlanKindHandler):
                             "Governed tag assignment authority could not be determined; fixture "
                             "execution simulates the requested change only."
                         )
+            elif self.kind in {
+                w.PlanKind.CREATE_ABAC_POLICY,
+                w.PlanKind.UPDATE_ABAC_POLICY,
+                w.PlanKind.DELETE_ABAC_POLICY,
+            }:
+                policy_changes = self._policy_changes(request.changes, target)
+                prior = (
+                    None
+                    if self.kind == w.PlanKind.CREATE_ABAC_POLICY
+                    else self.adapter.get_abac_policy(policy_changes.policy_id)
+                )
+                policy = self._policy_value(target, policy_changes, prior)
+                known_impact, unknown_impact = self._policy_impact(
+                    prior or policy, delete=self.kind == w.PlanKind.DELETE_ABAC_POLICY
+                )
+                known.extend(known_impact)
+                unknown.extend(unknown_impact)
+                if self.kind == w.PlanKind.CREATE_ABAC_POLICY:
+                    description = (
+                        f"Create {policy_changes.policy_type} policy `{policy_changes.name}` on "
+                        f"`{target.full_name}`."
+                    )
+                    method = "policies.create_policy"
+                elif self.kind == w.PlanKind.UPDATE_ABAC_POLICY:
+                    description = (
+                        f"Update {policy_changes.policy_type} policy `{policy_changes.name}` on "
+                        f"`{target.full_name}`."
+                    )
+                    method = "policies.update_policy"
+                else:
+                    description = (
+                        f"Delete policy `{prior.name if prior else policy_changes.name}` from "
+                        f"`{target.full_name}`; this may widen access."
+                    )
+                    method = "policies.delete_policy"
+                normalized.append(
+                    w.NormalizedChange(
+                        target=target,
+                        description=description,
+                        statement_preview=_statement(
+                            method,
+                            target,
+                            policy_id=policy_changes.policy_id,
+                            name=policy_changes.name,
+                            policy_type=policy_changes.policy_type,
+                            when_condition=policy_changes.when_condition,
+                            to_principals=policy_changes.to_principals,
+                            except_principals=policy_changes.except_principals,
+                            function_full_name=policy_changes.function_full_name,
+                            match_columns=policy_changes.match_columns,
+                        ),
+                    )
+                )
+                prerequisites.append(
+                    "Databricks must authorize MANAGE on the scope and EXECUTE on the policy "
+                    "function; "
+                    "this application does not infer those privileges."
+                )
             else:
                 raise NotImplementedYet()
         return Preview(
@@ -683,9 +1014,10 @@ class FixturePlanKindHandler(PlanKindHandler):
             impact=w.Impact(known=known, unknown=unknown),
             prerequisite_notes=tuple(dict.fromkeys(prerequisites)),
             inheritance_note=inheritance,
-            requires_typed_confirmation=self.kind == w.PlanKind.TRANSFER_OWNERSHIP,
+            requires_typed_confirmation=self.kind
+            in {w.PlanKind.TRANSFER_OWNERSHIP, w.PlanKind.DELETE_ABAC_POLICY},
             typed_confirmation_value=targets[0].full_name
-            if self.kind == w.PlanKind.TRANSFER_OWNERSHIP
+            if self.kind in {w.PlanKind.TRANSFER_OWNERSHIP, w.PlanKind.DELETE_ABAC_POLICY}
             else None,
         )
 
@@ -764,6 +1096,30 @@ class FixturePlanKindHandler(PlanKindHandler):
                 tuple(selected_remove),
             )
             return MutationWriteResult(status="applied", summary="Tag changes were sent.")
+        if self.kind in {
+            w.PlanKind.CREATE_ABAC_POLICY,
+            w.PlanKind.UPDATE_ABAC_POLICY,
+            w.PlanKind.DELETE_ABAC_POLICY,
+        }:
+            policy_delta = self._policy_changes(changes, target, allow_existing=True)
+            prior = (
+                None
+                if self.kind == w.PlanKind.CREATE_ABAC_POLICY
+                else self.adapter.get_abac_policy(policy_delta.policy_id)
+            )
+            policy = self._policy_value(target, policy_delta, prior)
+            if self.kind == w.PlanKind.CREATE_ABAC_POLICY:
+                self.adapter.create_abac_policy(policy)
+                return MutationWriteResult(
+                    status="applied", summary="ABAC policy creation was sent."
+                )
+            if self.kind == w.PlanKind.UPDATE_ABAC_POLICY:
+                self.adapter.update_abac_policy(policy_delta.policy_id, policy)
+                return MutationWriteResult(status="applied", summary="ABAC policy update was sent.")
+            self.adapter.delete_abac_policy(policy_delta.policy_id)
+            return MutationWriteResult(
+                status="applied", summary="ABAC policy deletion was sent; access may widen."
+            )
         raise NotImplementedYet()
 
     def verify(self, target: w.AssetRef, changes: dict[str, object]) -> bool | None:
@@ -795,6 +1151,30 @@ class FixturePlanKindHandler(PlanKindHandler):
                     for change in tag_delta.tags
                 )
             return all(change.key not in current for change in tag_delta.tags)
+        if self.kind in {
+            w.PlanKind.CREATE_ABAC_POLICY,
+            w.PlanKind.UPDATE_ABAC_POLICY,
+            w.PlanKind.DELETE_ABAC_POLICY,
+        }:
+            if self.kind == w.PlanKind.DELETE_ABAC_POLICY:
+                policy_id = _string(changes.get("policy_id"), "changes.policy_id")
+                try:
+                    self.adapter.get_abac_policy(policy_id)
+                except Exception:
+                    return True
+                return False
+            policy_delta = self._policy_changes(changes, target, allow_existing=True)
+            current_policy = self.adapter.get_abac_policy(policy_delta.policy_id)
+            expected = self._policy_value(target, policy_delta, current_policy)
+            return (
+                current_policy.name == expected.name
+                and current_policy.policy_type == expected.policy_type
+                and current_policy.when_condition == expected.when_condition
+                and current_policy.to_principals == expected.to_principals
+                and current_policy.except_principals == expected.except_principals
+                and current_policy.function_full_name == expected.function_full_name
+                and current_policy.match_columns == expected.match_columns
+            )
         return None
 
 
@@ -810,6 +1190,9 @@ def register_fixture_plan_kinds(
             w.PlanKind.EDIT_METADATA,
             w.PlanKind.ASSIGN_TAGS,
             w.PlanKind.REMOVE_TAGS,
+            w.PlanKind.CREATE_ABAC_POLICY,
+            w.PlanKind.UPDATE_ABAC_POLICY,
+            w.PlanKind.DELETE_ABAC_POLICY,
         )
     )
 
@@ -824,5 +1207,8 @@ def register_connected_readonly_plan_kinds() -> tuple[RegisteredPlanKind, ...]:
             w.PlanKind.EDIT_METADATA,
             w.PlanKind.ASSIGN_TAGS,
             w.PlanKind.REMOVE_TAGS,
+            w.PlanKind.CREATE_ABAC_POLICY,
+            w.PlanKind.UPDATE_ABAC_POLICY,
+            w.PlanKind.DELETE_ABAC_POLICY,
         )
     )

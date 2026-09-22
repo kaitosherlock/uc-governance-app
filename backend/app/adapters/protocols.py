@@ -3,6 +3,7 @@
 from typing import Protocol
 
 from app.domain.models import (
+    AbacPolicy,
     AssetDetail,
     AssetSummary,
     DependenciesData,
@@ -76,3 +77,15 @@ class TagReader(Protocol):
     def list_tag_policies(
         self, page_size: int, page_token: str | None
     ) -> tuple[list[TagPolicy], str | None]: ...
+
+
+class PolicyReader(Protocol):
+    def list_abac_policies(
+        self, scope_full_name: str | None, page_size: int, page_token: str | None
+    ) -> tuple[list[AbacPolicy], str | None]: ...
+
+    def get_abac_policy(self, policy_id: str) -> AbacPolicy: ...
+
+    def abac_policy_impact(
+        self, policy_id: str, page_size: int
+    ) -> tuple[list[AssetSummary], tuple[str, ...]]: ...

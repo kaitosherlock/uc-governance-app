@@ -133,7 +133,7 @@ function SchemaNode({
       </div>
 
       {isExpanded ? (
-        <ul className="space-y-0.5" role="group">
+        <ul className="space-y-0.5">
           {objectsQuery.isLoading ? (
             <li className="pl-6 py-1">
               <LocalizedSkeleton className="h-4 w-28" />
@@ -236,7 +236,7 @@ function CatalogNode({
       </div>
 
       {isExpanded ? (
-        <ul className="pl-4 space-y-0.5" role="group">
+        <ul className="pl-4 space-y-0.5">
           {schemasQuery.isLoading ? (
             <li className="py-1">
               <LocalizedSkeleton className="h-4 w-32" />
@@ -354,7 +354,7 @@ export function AssetTree({
           />
         </div>
       ) : catalogsQuery.data?.data && catalogsQuery.data.data.length > 0 ? (
-        <ul className="space-y-1" role="tree">
+        <ul className="space-y-1">
           {catalogsQuery.data.data.map((cat) => (
             <CatalogNode
               key={cat.full_name}

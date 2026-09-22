@@ -28,6 +28,12 @@ READ_CALLS: dict[str, tuple[str, str]] = {
     "getGrants": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/grants"),
     "getTags": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/tags"),
     "listTagPolicies": ("GET", "/api/v1/tag-policies"),
+    "listAbacPolicies": ("GET", "/api/v1/abac-policies"),
+    "getAbacPolicy": ("GET", "/api/v1/abac-policies/fixture-policy-sales-sensitive-rows"),
+    "previewAbacPolicyImpact": (
+        "GET",
+        "/api/v1/abac-policies/fixture-policy-sales-sensitive-rows/impact",
+    ),
     "listPrivileges": ("GET", "/api/v1/privileges?securable_type=TABLE"),
     "searchPrincipals": ("GET", "/api/v1/principals/search?q=an"),
 }

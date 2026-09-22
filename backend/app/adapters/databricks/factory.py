@@ -10,6 +10,7 @@ from app.adapters.databricks.dependencies import DependenciesAdapter
 from app.adapters.databricks.functions import FunctionsAdapter
 from app.adapters.databricks.grants import GrantsAdapter
 from app.adapters.databricks.models import ModelsAdapter
+from app.adapters.databricks.policies import PoliciesAdapter
 from app.adapters.databricks.principals import PrincipalsAdapter
 from app.adapters.databricks.schemas import SchemasAdapter
 from app.adapters.databricks.tables import TablesAdapter
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
         EntityTagAssignmentsAPI,
         FunctionsAPI,
         GrantsAPI,
+        PoliciesAPI,
         RegisteredModelsAPI,
         SchemasAPI,
         TablesAPI,
@@ -188,6 +190,7 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         cursors,
         key,
     )
+    policies = PoliciesAdapter(cast("PoliciesAPI", service("policies")), cursors, key)
     principals = PrincipalsAdapter(
         cast("UsersAPI", service("users", "sp")),
         cast("GroupsAPI", service("groups", "sp")),
@@ -215,5 +218,6 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         principals=principals,
         dependencies=DependenciesAdapter(),
         tags=tags,
+        policies=policies,
         privilege_codes=tuple(p.value for p in Privilege),
     )

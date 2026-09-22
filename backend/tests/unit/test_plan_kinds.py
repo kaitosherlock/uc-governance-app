@@ -11,7 +11,7 @@ from app.domain.enums import ActionName, SecurableType, TagKind
 from app.domain.models import AllowedAction, Tag
 from app.domain.privileges import APPLICABILITY
 from app.domain.reads import ReadPolicy
-from app.errors import ModeReadOnly, ValidationFailed
+from app.errors import ModeReadOnly, PlanStale, ValidationFailed
 from app.mutations.core import MutationEngine, PlanKindRegistry
 from app.mutations.plan_kinds import (
     register_connected_readonly_plan_kinds,
@@ -48,6 +48,29 @@ def request(
         targets=[w.PlanTarget(securable_type=SecurableType.TABLE, full_name=name)],
         changes=changes,
         reason="Fixture plan-kind test",
+    )
+
+
+def policy_changes(**overrides: object) -> dict[str, object]:
+    values: dict[str, object] = {
+        "name": "filter_sales_internal",
+        "policy_type": "row_filter",
+        "when_condition": "has_tag_value('sensitivity', 'internal')",
+        "to_principals": ["analysts"],
+        "except_principals": [],
+        "function_full_name": "shared_ref.governance.normalize_id",
+        "match_columns": ["id"],
+    }
+    values.update(overrides)
+    return values
+
+
+def policy_request(kind: w.PlanKind, changes: dict[str, object]) -> w.PlanCreateRequest:
+    return w.PlanCreateRequest(
+        kind=kind,
+        targets=[w.PlanTarget(securable_type=SecurableType.CATALOG, full_name="sales")],
+        changes=changes,
+        reason="Fixture ABAC policy test",
     )
 
 
@@ -149,6 +172,140 @@ def test_fixture_writes_are_read_back_for_all_registered_kinds() -> None:
         assert operation.targets[0].verified is True
 
 
+def test_policy_signature_and_scope_validation_name_the_reason() -> None:
+    with pytest.raises(ValidationFailed) as signature:
+        fixture_engine().build(
+            policy_request(
+                w.PlanKind.CREATE_ABAC_POLICY,
+                policy_changes(policy_type="column_mask"),
+            ),
+            identity(),
+        )
+    assert signature.value.errors[0].code == "UNSUPPORTED_SIGNATURE"
+    assert "column_mask" in signature.value.message
+
+    invalid_scope = w.PlanCreateRequest(
+        kind=w.PlanKind.CREATE_ABAC_POLICY,
+        targets=[
+            w.PlanTarget(securable_type=SecurableType.VOLUME, full_name="sales.crm.raw_exports")
+        ],
+        changes=policy_changes(),
+        reason="Reject unsupported policy scope",
+    )
+    with pytest.raises(ValidationFailed) as scope:
+        fixture_engine().build(invalid_scope, identity())
+    assert scope.value.errors[0].code == "UNSUPPORTED_SCOPE"
+
+
+def test_delete_policy_requires_typed_confirmation_and_discloses_widening() -> None:
+    engine = fixture_engine()
+    plan = engine.build(
+        policy_request(
+            w.PlanKind.DELETE_ABAC_POLICY,
+            {"policy_id": "fixture-policy-sales-sensitive-rows"},
+        ),
+        identity(),
+    )
+    assert plan.requires_typed_confirmation is True
+    assert plan.typed_confirmation_value == "sales"
+    assert "widen access" in plan.normalized_changes[0].description
+    assert any("may widen access" in value for value in plan.impact.known)
+    assert plan.impact.unknown
+    assert any("not evaluated by databricks" in value.lower() for value in plan.impact.unknown)
+    with pytest.raises(ValidationFailed):
+        engine.execute(
+            plan.id,
+            w.PlanExecuteRequest(
+                confirmation_token=plan.confirmation_token,
+                typed_name="not-the-required-scope",
+            ),
+            identity(),
+            "fixture-correlation",
+        )
+
+
+def test_update_policy_definition_change_after_preview_is_stale() -> None:
+    engine = fixture_engine()
+    policy_id = "fixture-policy-sales-sensitive-rows"
+    current = engine.registry.get(w.PlanKind.UPDATE_ABAC_POLICY).adapter.get_abac_policy(policy_id)  # type: ignore[attr-defined]
+    plan = engine.build(
+        policy_request(
+            w.PlanKind.UPDATE_ABAC_POLICY,
+            policy_changes(policy_id=policy_id, name=current.name),
+        ),
+        identity(),
+    )
+    adapter = engine.registry.get(w.PlanKind.UPDATE_ABAC_POLICY).adapter  # type: ignore[attr-defined]
+    adapter.abac_policies[policy_id] = replace(current, when_condition="has_tag('sensitivity')")
+    with pytest.raises(PlanStale):
+        engine.execute(
+            plan.id,
+            w.PlanExecuteRequest(confirmation_token=plan.confirmation_token),
+            identity(),
+            "fixture-correlation",
+        )
+
+
+def test_all_policy_plan_kinds_write_and_read_back() -> None:
+    create_engine = fixture_engine()
+    create = create_engine.build(
+        policy_request(w.PlanKind.CREATE_ABAC_POLICY, policy_changes(name="new_sales_filter")),
+        identity(),
+    )
+    created = create_engine.execute(
+        create.id,
+        w.PlanExecuteRequest(confirmation_token=create.confirmation_token),
+        identity(),
+        "fixture-correlation",
+    )
+    assert created.targets[0].verified is True
+
+    policy_id = "fixture-policy-sales-sensitive-rows"
+    update_engine = fixture_engine()
+    current = update_engine.registry.get(w.PlanKind.UPDATE_ABAC_POLICY).adapter.get_abac_policy(  # type: ignore[attr-defined]
+        policy_id
+    )
+    update = update_engine.build(
+        policy_request(
+            w.PlanKind.UPDATE_ABAC_POLICY,
+            policy_changes(policy_id=policy_id, name=current.name, to_principals=["auditors"]),
+        ),
+        identity(),
+    )
+    updated = update_engine.execute(
+        update.id,
+        w.PlanExecuteRequest(confirmation_token=update.confirmation_token),
+        identity(),
+        "fixture-correlation",
+    )
+    assert updated.targets[0].verified is True
+
+    delete_engine = fixture_engine()
+    delete = delete_engine.build(
+        policy_request(w.PlanKind.DELETE_ABAC_POLICY, {"policy_id": policy_id}), identity()
+    )
+    deleted = delete_engine.execute(
+        delete.id,
+        w.PlanExecuteRequest(
+            confirmation_token=delete.confirmation_token,
+            typed_name="sales",
+        ),
+        identity(),
+        "fixture-correlation",
+    )
+    assert deleted.targets[0].verified is True
+
+
+def test_policy_statement_preview_json_quotes_crafted_name() -> None:
+    name = 'policy"; DROP POLICY safe; --'
+    plan = fixture_engine().build(
+        policy_request(w.PlanKind.CREATE_ABAC_POLICY, policy_changes(name=name)), identity()
+    )
+    preview = plan.normalized_changes[0].statement_preview
+    assert f"name={json.dumps(name, ensure_ascii=False, separators=(',', ':'))}" in preview
+    assert f'name="{name}"' not in preview
+
+
 def test_statement_preview_json_quotes_a_crafted_identifier() -> None:
     adapter = FixtureReaders()
     crafted = 'sales.crm.`orders"; DROP TABLE grants; --`'
@@ -200,6 +357,11 @@ def test_readonly_mode_rejects_each_registered_kind_before_any_write(
         w.PlanKind.EDIT_METADATA: {"comment": "Read-only attempt"},
         w.PlanKind.ASSIGN_TAGS: {"tags": [{"key": "data_domain", "value": "finance"}]},
         w.PlanKind.REMOVE_TAGS: {"tags": [{"key": "data_domain"}]},
+        w.PlanKind.CREATE_ABAC_POLICY: policy_changes(),
+        w.PlanKind.UPDATE_ABAC_POLICY: policy_changes(
+            policy_id="fixture-policy-sales-sensitive-rows"
+        ),
+        w.PlanKind.DELETE_ABAC_POLICY: {"policy_id": "fixture-policy-sales-sensitive-rows"},
     }
     for kind, payload in changes.items():
         with pytest.raises(ModeReadOnly):

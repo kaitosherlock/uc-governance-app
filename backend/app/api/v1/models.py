@@ -407,6 +407,44 @@ class TagPolicyListResponse(SuccessResponse[list[TagPolicy]]):
     page: Page
 
 
+class AbacPolicyType(StrEnum):
+    ROW_FILTER = "row_filter"
+    COLUMN_MASK = "column_mask"
+
+
+class AbacPolicy(ContractModel):
+    id: str
+    name: str
+    policy_type: AbacPolicyType
+    scope: AssetRef
+    when_condition: str
+    to_principals: list[str]
+    except_principals: list[str]
+    function_full_name: str
+    match_columns: list[str]
+    owner: str | None
+    created_at: UtcTimestamp | None
+    updated_at: UtcTimestamp | None
+    allowed_actions: list[AllowedAction]
+
+
+class AbacPolicyResponse(SuccessResponse[AbacPolicy]):
+    pass
+
+
+class AbacPolicyListResponse(SuccessResponse[list[AbacPolicy]]):
+    page: Page
+
+
+class PolicyImpactData(ContractModel):
+    potentially_affected: list[AssetSummary]
+    disclaimer: str
+
+
+class PolicyImpactResponse(SuccessResponse[PolicyImpactData]):
+    pass
+
+
 class PlanKind(StrEnum):
     GRANT = "grant"
     REVOKE = "revoke"

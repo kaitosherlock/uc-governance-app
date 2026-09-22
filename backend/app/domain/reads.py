@@ -8,6 +8,7 @@ from app.adapters.protocols import (
     DependencyReader,
     GrantReader,
     ObjectReader,
+    PolicyReader,
     PrincipalReader,
     SchemaReader,
     TagReader,
@@ -17,6 +18,7 @@ from app.authz.roles import Target, decide
 from app.config.settings import Settings
 from app.domain.enums import ActionName, GrantSourceType, TagKind
 from app.domain.models import (
+    AbacPolicy,
     AllowedAction,
     AssetDetail,
     AssetSummary,
@@ -43,6 +45,7 @@ class Readers:
     principals: PrincipalReader
     dependencies: DependencyReader
     tags: TagReader
+    policies: PolicyReader
     privilege_codes: tuple[str, ...]
 
 
@@ -219,6 +222,40 @@ class ReadService:
         self.authorize("tag_policies.read")
         values, token = self.readers.tags.list_tag_policies(page_size, page_token)
         return [self.tag_policy(value) for value in values], token
+
+    def abac_policies(
+        self, scope_full_name: str | None, page_size: int, page_token: str | None
+    ) -> tuple[list[AbacPolicy], str | None]:
+        if scope_full_name:
+            self.authorize("abac_policies.read", scope_full_name.split(".")[0])
+        else:
+            self.authorize("abac_policies.read")
+        values, token = self.readers.policies.list_abac_policies(
+            scope_full_name, page_size, page_token
+        )
+        return values, token
+
+    def abac_policy(self, policy_id: str) -> AbacPolicy:
+        value = self.readers.policies.get_abac_policy(policy_id)
+        self.authorize("abac_policies.read", value.scope.full_name.split(".")[0])
+        return value
+
+    def abac_policy_impact(
+        self, policy_id: str, page_size: int
+    ) -> tuple[AbacPolicy, list[AssetSummary], tuple[str, ...]]:
+        policy = self.abac_policy(policy_id)
+        values, unknown = self.readers.policies.abac_policy_impact(policy_id, page_size)
+        visible = [
+            value
+            for value in values
+            if not self.settings.managed_catalogs
+            or value.full_name.split(".")[0] in self.settings.managed_catalogs
+        ]
+        if self.settings.managed_catalogs and policy.scope.full_name.split(".")[0] not in set(
+            self.settings.managed_catalogs
+        ):
+            raise ForbiddenScope("Policy scope is outside the managed scope.")
+        return policy, visible, unknown
 
     def explain(self, grant: Grant, catalog: str | None) -> Grant:
         if grant.source.type == GrantSourceType.INHERITED:

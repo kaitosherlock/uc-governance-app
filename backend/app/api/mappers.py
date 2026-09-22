@@ -56,6 +56,24 @@ def map_TagPolicy(value: d.TagPolicy) -> w.TagPolicy:
     )
 
 
+def map_AbacPolicy(value: d.AbacPolicy) -> w.AbacPolicy:
+    return w.AbacPolicy(
+        id=value.id,
+        name=value.name,
+        policy_type=w.AbacPolicyType(value.policy_type),
+        scope=map_AssetRef(value.scope),
+        when_condition=value.when_condition,
+        to_principals=list(value.to_principals),
+        except_principals=list(value.except_principals),
+        function_full_name=value.function_full_name,
+        match_columns=list(value.match_columns),
+        owner=value.owner,
+        created_at=value.created_at,
+        updated_at=value.updated_at,
+        allowed_actions=[map_AllowedAction(x) for x in value.allowed_actions],
+    )
+
+
 def map_RowFilterRef(value: d.RowFilterRef) -> w.RowFilterRef:
     return w.RowFilterRef(
         function_full_name=value.function_full_name,

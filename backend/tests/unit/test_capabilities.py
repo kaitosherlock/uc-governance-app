@@ -20,6 +20,8 @@ def test_only_implemented_capabilities_available() -> None:
         "tags.read",
         "tags.update",
         "tag_policies.read",
+        "abac_policies.read",
+        "abac_policies.update",
         "plans.lifecycle_core",
         "plans.read",
         "operations.read",

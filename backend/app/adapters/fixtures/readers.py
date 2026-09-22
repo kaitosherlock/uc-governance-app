@@ -1,11 +1,14 @@
 """All read protocols plus isolated grant deltas for the future plan executor."""
 
+import re
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import TypeVar, cast
 
 from app.adapters.protocols import METADATA_COMMENT_UNSET
 from app.domain.enums import GrantSourceType, SecurableType
 from app.domain.models import (
+    AbacPolicy,
     AssetDetail,
     AssetSummary,
     DependenciesData,
@@ -18,10 +21,16 @@ from app.domain.models import (
 from app.errors import NotFound, ValidationFailed
 from app.fixtures_data.dataset import (
     DEPENDENCIES,
+    build_abac_policies,
     build_assets,
     build_grants,
     build_principals,
     build_tag_policies,
+)
+
+_HAS_TAG = re.compile(r"^has_tag\('([A-Za-z0-9_.-]+)'\)$")
+_HAS_TAG_VALUE = re.compile(
+    r"^has_tag_value\('([A-Za-z0-9_.-]+)',\s*'([^']+)'\)$"
 )
 
 T = TypeVar("T")
@@ -47,6 +56,7 @@ class FixtureReaders:
         self.principals = build_principals()
         self.grants = build_grants()
         self.tag_policies = build_tag_policies()
+        self.abac_policies = {value.id: value for value in build_abac_policies()}
 
     def list_catalogs(
         self, page_size: int, page_token: str | None
@@ -141,6 +151,86 @@ class FixtureReaders:
         self, page_size: int, page_token: str | None
     ) -> tuple[list[TagPolicy], str | None]:
         return page(list(self.tag_policies), page_size, page_token, "tag-policies")
+
+    def list_abac_policies(
+        self, scope_full_name: str | None, page_size: int, page_token: str | None
+    ) -> tuple[list[AbacPolicy], str | None]:
+        values = list(self.abac_policies.values())
+        if scope_full_name is not None:
+            values = [value for value in values if value.scope.full_name == scope_full_name]
+        return page(values, page_size, page_token, f"abac-policies:{scope_full_name or 'visible'}")
+
+    def get_abac_policy(self, policy_id: str) -> AbacPolicy:
+        result = self.abac_policies.get(policy_id)
+        if result is None:
+            raise NotFound()
+        return result
+
+    @staticmethod
+    def _matches_policy(asset: AssetSummary, policy: AbacPolicy) -> bool:
+        if asset.securable_type != SecurableType.TABLE:
+            return False
+        condition = _HAS_TAG.fullmatch(policy.when_condition)
+        key: str | None = None
+        expected: str | None = None
+        if condition:
+            key = condition.group(1)
+        else:
+            condition = _HAS_TAG_VALUE.fullmatch(policy.when_condition)
+            if condition:
+                key, expected = condition.groups()
+        if key is None:
+            return False
+        details = asset if isinstance(asset, AssetDetail) else None
+        if details is None:
+            return False
+        tags = details.tags if policy.policy_type == "row_filter" else tuple(
+            tag for column in details.columns for tag in column.tags
+        )
+        return any(tag.key == key and (expected is None or tag.value == expected) for tag in tags)
+
+    def abac_policy_impact(
+        self, policy_id: str, page_size: int
+    ) -> tuple[list[AssetSummary], tuple[str, ...]]:
+        return self.abac_policy_impact_for(self.get_abac_policy(policy_id), page_size)
+
+    def abac_policy_impact_for(
+        self, policy: AbacPolicy, page_size: int
+    ) -> tuple[list[AssetSummary], tuple[str, ...]]:
+        prefix = policy.scope.full_name + "."
+        candidates = [
+            asset
+            for asset in self.assets.values()
+            if asset.full_name == policy.scope.full_name or asset.full_name.startswith(prefix)
+        ]
+        known: list[AssetSummary] = [
+            asset for asset in candidates if self._matches_policy(asset, policy)
+        ]
+        values, token = page(known, page_size, None, f"abac-impact:{policy.id}")
+        unknown = [
+            "Not evaluated by Databricks. This application matched only visible metadata tags; "
+            "it did not execute the policy.",
+            "Group membership and unresolved principals were not evaluated.",
+            "Assets outside the caller's visible scope may also be affected.",
+        ]
+        if token:
+            unknown.append(
+                "Additional matching visible assets were not enumerated due to the page limit."
+            )
+        return values, tuple(unknown)
+
+    def create_abac_policy(self, value: AbacPolicy) -> None:
+        if value.id in self.abac_policies:
+            raise ValidationFailed("An ABAC policy with this id already exists.")
+        self.abac_policies[value.id] = value
+
+    def update_abac_policy(self, policy_id: str, value: AbacPolicy) -> None:
+        self.get_abac_policy(policy_id)
+        self.abac_policies[policy_id] = replace(value, id=policy_id, updated_at=datetime.now(UTC))
+
+    def delete_abac_policy(self, policy_id: str) -> None:
+        self.get_abac_policy(policy_id)
+        del self.abac_policies[policy_id]
 
     def update_tags(
         self,

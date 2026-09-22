@@ -1,0 +1,23 @@
+{
+    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T150140Z-backend-P2-03.log",
+    "tier":  "tier_reasoning",
+    "agent":  "backend",
+    "session_id":  "01a0c9a3-11bc-7100-b02b-6303eadcecd3",
+    "finished_at":  "2026-09-22T15:23:29.5579618Z",
+    "seconds":  1309,
+    "prompt_chars":  5808,
+    "started_at":  "2026-09-22T15:01:40.7035787Z",
+    "quota_pattern":  "",
+    "model":  "gpt-5.6-terra",
+    "last_message_excerpt":  "P2-03 is complete.\n\n- Added ABAC policy list/get/impact reads and fixture CRUD plan kinds.\n- Policy impact is explicitly â€œNot evaluated by Databricksâ€; plans retain `impact.known` and `impact.unknown`.\n- Delete requires typed confirmation; updates detect definition drift as `PLAN_STALE`; previews quote crafted input safely.\n- Confirmed PoliciesAPI signatures on SDK 0.140.0 and updated capability rows.\n\nVerification: Ruff and Mypy pass; API/unit/SDK-shape tests: 385 passed. Full pytest remains sandbox-blocked by denied `jsonschema_specifications` package-data access.",
+    "history":  [
+                    "2026-09-22T15:01:40.7135469Z dispatched",
+                    "2026-09-22T15:23:29.5687271Z completed"
+                ],
+    "task_id":  "P2-03",
+    "status":  "completed",
+    "effort":  "high",
+    "exit_code":  0,
+    "attempt":  1,
+    "prompt_file":  ".ai/prompts/P2-03.md"
+}

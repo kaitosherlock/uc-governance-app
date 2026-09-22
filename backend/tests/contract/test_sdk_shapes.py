@@ -244,6 +244,21 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
 
 # Fields the planned allowlisted mappers actually need, including nested DTOs.
 DTO_FIELDS = {
+    ("policies", "create_policy"): {
+        "databricks.sdk.service.catalog.PolicyInfo": (
+            "id",
+            "name",
+            "on_securable_type",
+            "on_securable_fullname",
+            "policy_type",
+            "when_condition",
+            "to_principals",
+            "except_principals",
+            "row_filter",
+            "column_mask",
+            "match_columns",
+        ),
+    },
     ("tables", "get"): {
         "databricks.sdk.service.catalog.TableInfo": (
             "full_name",

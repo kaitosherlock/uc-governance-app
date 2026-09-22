@@ -316,6 +316,90 @@ def list_tag_policies(
 
 
 @router.get(
+    "/abac-policies",
+    response_model=w.AbacPolicyListResponse,
+    operation_id="listAbacPolicies",
+    responses=responses(401, 403, 500, 501, 503),
+)
+def list_abac_policies(
+    request: Request,
+    svc: Service,
+    scope_full_name: str | None = None,
+    page_size: PageSize = 50,
+    page_token: str | None = None,
+) -> w.AbacPolicyListResponse:
+    values, token = svc.abac_policies(scope_full_name, page_size, page_token)
+    return w.AbacPolicyListResponse(
+        success=True,
+        data=[mappers.map_AbacPolicy(value) for value in values],
+        meta=meta(
+            request,
+            svc,
+            limitations=[
+                "Policy fields unavailable from the source are labelled unavailable; no defaults "
+                "are inferred.",
+                "Listing reflects only policies available through this application's "
+                "visible scope.",
+            ],
+            next_token=token,
+            partial=scope_full_name is None,
+        ),
+        page=w.Page(page_size=page_size, next_page_token=token),
+    )
+
+
+@router.get(
+    "/abac-policies/{policy_id}/impact",
+    response_model=w.PolicyImpactResponse,
+    operation_id="previewAbacPolicyImpact",
+    responses=responses(401, 403, 404, 500, 501),
+)
+def preview_abac_policy_impact(
+    policy_id: str, request: Request, svc: Service, page_size: PageSize = 50
+) -> w.PolicyImpactResponse:
+    policy, values, unknown = svc.abac_policy_impact(policy_id, page_size)
+    disclaimer = "Potentially affected within your visible scope. Not evaluated by Databricks."
+    return w.PolicyImpactResponse(
+        success=True,
+        data=w.PolicyImpactData(
+            potentially_affected=[mappers.map_AssetSummary(svc.summary(value)) for value in values],
+            disclaimer=disclaimer,
+        ),
+        meta=meta(
+            request,
+            svc,
+            policy.scope.full_name.split(".")[0],
+            limitations=list(unknown),
+            partial=True,
+        ),
+    )
+
+
+@router.get(
+    "/abac-policies/{policy_id}",
+    response_model=w.AbacPolicyResponse,
+    operation_id="getAbacPolicy",
+    responses=responses(401, 403, 404, 500, 501),
+)
+def get_abac_policy(
+    policy_id: str, request: Request, svc: Service
+) -> w.AbacPolicyResponse:
+    value = svc.abac_policy(policy_id)
+    return w.AbacPolicyResponse(
+        success=True,
+        data=mappers.map_AbacPolicy(value),
+        meta=meta(
+            request,
+            svc,
+            value.scope.full_name.split(".")[0],
+            limitations=[
+                "This metadata describes a policy definition; it is not a Databricks evaluation."
+            ],
+        ),
+    )
+
+
+@router.get(
     "/privileges",
     response_model=w.PrivilegeListResponse,
     operation_id="listPrivileges",

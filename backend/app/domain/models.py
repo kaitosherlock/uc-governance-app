@@ -83,6 +83,23 @@ class TagPolicy:
 
 
 @dataclass(frozen=True, kw_only=True)
+class AbacPolicy:
+    id: str
+    name: str
+    policy_type: Literal["row_filter", "column_mask"]
+    scope: AssetRef
+    when_condition: str
+    to_principals: tuple[str, ...]
+    except_principals: tuple[str, ...]
+    function_full_name: str
+    match_columns: tuple[str, ...]
+    owner: str | None
+    created_at: datetime | None
+    updated_at: datetime | None
+    allowed_actions: tuple[AllowedAction, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
 class RowFilterRef:
     function_full_name: str
     input_columns: tuple[str, ...]

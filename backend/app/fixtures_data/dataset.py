@@ -15,6 +15,7 @@ from app.domain.enums import (
     TagKind,
 )
 from app.domain.models import (
+    AbacPolicy,
     AssetDetail,
     AssetRef,
     Column,
@@ -200,6 +201,31 @@ def build_tag_policies() -> tuple[TagPolicy, ...]:
             key="retention",
             description="No values are currently approved.",
             allowed_values=(),
+            allowed_actions=(),
+        ),
+    )
+
+
+def build_abac_policies() -> tuple[AbacPolicy, ...]:
+    return (
+        AbacPolicy(
+            id="fixture-policy-sales-sensitive-rows",
+            name="filter_sensitive_sales_rows",
+            policy_type="row_filter",
+            scope=AssetRef(
+                securable_type=SecurableType.CATALOG,
+                full_name="sales",
+                kind=ObjectKind.CATALOG,
+                display_name="sales",
+            ),
+            when_condition="has_tag_value('sensitivity', 'internal')",
+            to_principals=("analysts",),
+            except_principals=("data-eng-owners",),
+            function_full_name="shared_ref.governance.normalize_id",
+            match_columns=("id",),
+            owner="data-eng-owners",
+            created_at=OBSERVED,
+            updated_at=OBSERVED,
             allowed_actions=(),
         ),
     )
