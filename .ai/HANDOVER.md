@@ -1,8 +1,8 @@
 # ORCHESTRATION HANDOVER STATE
 
-- **Timestamp**: 2026-09-22T13:34:00+07:00
-- **Current Phase**: Phase 0 — Foundations. P0-02, P0-03 and P0-04 complete and verified. The application runs.
-- **Active Task**: none. Both lanes are out of quota. Two tasks sit in the resume queue with their sessions intact.
+- **Timestamp**: 2026-09-22T15:05:00+07:00
+- **Current Phase**: Phase 1 read path COMPLETE and Gate 2 verified. P0-02, P0-03, P0-04, P0-06, P0-08, P1-01, P1-02, P1-03 all done. P0-05 is the only task in flight.
+- **Active Task**: P0-05 frontend, in_progress with UNVERIFIED edits in the working tree, uncommitted. Backend lane out of quota again after landing its work.
 - **Deployed**: https://uc-governance-7474654536971820.aws.databricksapps.com (workspace dbc-76001947-638a, mode connected_readonly, RUNNING).
 - **Published**: https://github.com/kaitosherlock/uc-governance-app (public).
 
@@ -72,45 +72,77 @@
 
 ## 2. IN-PROGRESS / CURRENT BLOCKER
 
-Nothing in flight. No blocker to the next dispatch.
+### The one thing to do first on resume
 
-**Resume queue, both lanes out of quota.**
+`P0-05` has rejection-round-2 edits sitting UNCOMMITTED and UNVERIFIED in `frontend/`. Run Gate 3
+before anything else, then commit if green:
 
-| Task | Lane | Session | State |
-|---|---|---|---|
-| `P1-READ` | backend, codex | `01a0c746` | 22 modules landed and 308 tests pass, but 227 ruff and 4 mypy errors remain because it stopped before tidying |
-| `P0-05` | frontend, agy | `9659217c` | one file written, parked out of the build; resets about 4h22m from 06:45 UTC |
+```
+cd frontend
+npx tsc --noEmit
+npx eslint .
+npx vitest run
+npx vite build
+```
 
-Resume with `./scripts/resume.ps1` for both, or `-Agent backend` / `-Agent frontend` for one.
-Use `.ai/prompts/P0-05-resume.md` for the frontend, which orders the writes so the tree is never
-broken partway and tells the agent to stop on a step boundary.
+Last measured state, after rejection round 1: `tsc` exit 0, `eslint` exit 0, vitest **37 of 38**.
+The single failure was `TestingLibraryElementError: Found multiple elements with the text:
+alice.steward@example.com` at `ContextBar.test.tsx:78`, because the outer span and the inner span
+both normalise to the same text. Round 2 fixed that at the source rather than papering over it: the
+actor and executor spans now carry `aria-label`s (7 in the file, up from 5) with the strings in
+`strings.ts`, and the test queries by `getByLabelText`. That also closed a genuine accessibility
+gap — a screen reader previously read two bare principal names with no way to tell the person from
+the service principal. **Verify it; do not assume it.**
 
-**Checkpoint is green.** Gate 1 passes 15 checks, 308 backend tests pass, and frontend tsc, eslint
-and vite build are all clean. The parked partial file is at
-`.ai/state/partial/P0-05.errors.ts.partial`; nothing was lost.
+If Gate 3 is green, commit `frontend/` and `tasks/`, mark P0-05 done, and push.
+If it is not, write the next rejection to `.ai/prompts/P0-05-gate3-reject3.md` and dispatch with
+`-Tier tier_utility -Continue`.
 
-**A detector bug in my own harness was found and fixed.** agy exited 0 while its JSON said
-`"status":"ERROR"` with a quota message, so the non-zero-exit rule produced a false negative and the
-interrupted task was recorded as completed. Unfinished work would have been dropped silently rather
-than resumed. `Test-QuotaExhausted` now also treats an explicit failure status in the agent's
-structured output as a failed run. Five cases are covered, including the guard that a successful run
-mentioning rate limits or 429 is still a success.
+### What passed its gates this session
 
-**Deployment facts.** The Azure workspace `adb-7405611500888142` is banned from Databricks Apps at
-the platform level and cannot host this app. The AWS workspace `dbc-76001947-638a` works and is
-where it now runs. That workspace caps at 3 apps; `adadghg` was deleted with the user's explicit
-choice to free the slot. Redeploy after a change with:
-`databricks sync <bundle> /Workspace/Users/minh18052003@gmail.com/uc-governance-app --full` then
-`databricks apps deploy uc-governance --source-code-path /Workspace/Users/minh18052003@gmail.com/uc-governance-app`.
-The bundle is app.yaml, requirements.txt, backend/app and a freshly built frontend/dist.
+- **Gate 1**: `OK: 15 checks passed`, run three times.
+- **Gate 2 PASS**: ruff `All checks passed` (was 227 errors), mypy `Success: no issues found in 52
+  source files` (was 4 errors, including the P0-08 `introspect_sdk.py:149` SimplePath vs Path),
+  pytest **342 passed** (was 308). Committed and pushed as `362c49f`.
+- **Gate 2 live proof**, run by the orchestrator rather than asserted: fixture mode returns 200 with
+  the contract envelope; `allowed_actions` are honest, with grant, edit_metadata and
+  transfer_ownership all `NOT_IMPLEMENTED` because the plan lifecycle does not exist yet; the grants
+  endpoint reports `group_membership_loaded: false` with the exact required limitation sentence and
+  refuses revoke on every inherited grant with `INHERITED_FROM_PARENT` plus a `navigate_to`.
+- **Fixture dataset** counted from the built readers: 3 catalogs, 12 schemas, 60 objects across all
+  required kinds, 25 principals with exactly 1 workspace-local group that is not UC eligible.
 
-Open items that do not block Phase 0:
+### Quota state, both lanes
 
-- **Q11**, agy cannot be granted the `command` permission. Tried `.agent/settings.json`, `.agy/settings.json`, `~/.agy/settings.json` with several rule spellings; all still auto-denied. `--dangerously-skip-permissions` is refused as too broad. Workaround in place: the orchestrator runs frontend commands.
-- **Q12**, codex has no usable network. `sandbox_workspace_write.network_access=true` makes the host reachable but PowerShell's HTTP client then fails TLS. Workaround in place: the orchestrator resolves versions and supplies pins.
-- **Environment note**: uv's managed Python 3.11 cannot create its minor-version symlink on this machine, probably a privilege issue. The interpreter itself is installed and usable, so `uv lock` and `uv sync` work. Do not "fix" this by widening `requires-python`; production is 3.11.
-- **eslint 9 is flagged unsupported by npm.** Kept deliberately so that jsx-a11y accessibility linting survives. Revisit when jsx-a11y supports eslint 10.
-- Deployment questions Q1 to Q8 remain open and change Phase 2 and Phase 4 scope, not Phase 0.
+| Lane | Model | State |
+|---|---|---|
+| backend, codex | `gpt-5.6-terra` | **exhausted**, hit at the END of the run after the work had landed. Session `01a0c746` preserved, P1-READ record is `quota_exhausted`. Gate 2 nevertheless passes on the code it wrote, so nothing is outstanding but the quota itself |
+| frontend, agy | `gemini-3.1-pro-high` / `gemini-3.8-flash-high` | **exhausted**, resets about 4h20m from 07:45 UTC |
+| frontend, agy | `gemini-3.8-flash-medium` | had quota as of 07:53 UTC and carried both rejection rounds |
+
+**Quota on the agy lane is PER MODEL.** This was proven, not guessed: flash-medium answered READY
+while pro-high returned RESOURCE_EXHAUSTED in the same minute. Probe the model you intend to use.
+
+### Three harness defects found and fixed, my own code
+
+1. `Build-Invocation` rendered an empty `{lastmsg}` as a dangling `--output-last-message`, so every
+   codex quota probe exited 2 before reaching the API. The first backend resume reported "probe
+   failed", which reads like a quota problem and was not one.
+2. `resume.ps1` probed with the `tier_utility` model but resumed at the task's own tier, so the
+   per-model quota above made the probe lie and the resume burn a call. It now probes the highest
+   tier actually pending on that lane.
+3. `resume.ps1` ignored `.ai/prompts/<TaskId>-resume.md` and sent a generic continuation whose step
+   4 told the agent to re-run the verification commands — precisely what ends an agy turn with
+   nothing written. Per-task resume prompts now win, and the run record stores the model actually
+   used rather than one cached before a model switch.
+
+### Still open
+
+- 39 tasks remain todo. Next by priority: **P1-04 and P1-05** the mutation plan lifecycle, then
+  P0-07, P0-09, P0-10, then P1-06 and P1-07 the asset and access UI, then Phase 2.
+- `P0-01` is still todo and unrelated to the above.
+- The deployed app at https://uc-governance-7474654536971820.aws.databricksapps.com is running the
+  PREVIOUS build. The Phase 1 read path is committed but **not deployed**.
 
 ## 2b. SCHEDULED CONTINUATION
 
