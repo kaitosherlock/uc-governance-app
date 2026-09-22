@@ -14,6 +14,9 @@ def test_only_implemented_read_capabilities_available() -> None:
         "grants.read",
         "principals.search",
         "privileges.read",
+        "plans.lifecycle_core",
+        "plans.read",
+        "operations.read",
     }
     assert len({row.capability for row in REGISTRY}) == len(REGISTRY)
     assert all(row.domain for row in REGISTRY)

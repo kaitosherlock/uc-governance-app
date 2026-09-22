@@ -104,3 +104,33 @@ class RateLimited(StandardError):
     error_code = ErrorCode.RATE_LIMITED
     status = 429
     default_message = "Databricks is rate-limiting requests. Try again in a moment."
+
+
+class PlanStale(StandardError):
+    error_code = ErrorCode.PLAN_STALE
+    status = 409
+    default_message = "The state changed since this preview was generated."
+
+
+class PlanExpired(StandardError):
+    error_code = ErrorCode.PLAN_EXPIRED
+    status = 409
+    default_message = "This preview has expired."
+
+
+class PlanTampered(StandardError):
+    error_code = ErrorCode.PLAN_TAMPERED
+    status = 409
+    default_message = "This preview cannot be confirmed."
+
+
+class PlanInvalidated(StandardError):
+    error_code = ErrorCode.PLAN_INVALIDATED
+    status = 409
+    default_message = "This preview has been invalidated."
+
+
+class DuplicateSubmission(StandardError):
+    error_code = ErrorCode.DUPLICATE_SUBMISSION
+    status = 409
+    default_message = "An operation already exists for this preview."

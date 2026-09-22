@@ -33,7 +33,11 @@ class Settings(BaseSettings):
     local_auth: str = ""
     bootstrap_admins: CommaList = Field(default_factory=list)
     warehouse_id: str = ""
-    plan_hmac_key: SecretStr = Field(default=SecretStr(""), repr=False, exclude=True)
+    plan_hmac_key: SecretStr = Field(
+        default=SecretStr("fixture-development-hmac-key-not-for-production"),
+        repr=False,
+        exclude=True,
+    )
     account_id: str = ""
     workspace_host: str = Field(default="", validation_alias="DATABRICKS_HOST")
     workspace_id: str | None = Field(default=None, validation_alias="DATABRICKS_WORKSPACE_ID")
@@ -75,6 +79,13 @@ class Settings(BaseSettings):
             raise ValueError("UCGOV_FIXTURE_ACTOR cannot be set in connected modes.")
         if self.bootstrap_admins and self.mode != Mode.CONNECTED_READONLY:
             raise ValueError("Bootstrap admins are allowed only in connected_readonly mode.")
+        hmac_key = self.plan_hmac_key.get_secret_value()
+        if self.mode == Mode.FIXTURE and not hmac_key:
+            self.plan_hmac_key = SecretStr("fixture-development-hmac-key-not-for-production")
+        if self.mode != Mode.FIXTURE and len(hmac_key) < 32:
+            raise ValueError(
+                "UCGOV_PLAN_HMAC_KEY must be at least 32 characters in connected modes."
+            )
         return self
 
     @property

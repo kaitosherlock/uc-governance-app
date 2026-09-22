@@ -41,11 +41,22 @@ def test_defaults_and_comma_parsing(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_guard_allows_connected_and_local_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     assert_mode_is_safe(Settings(), {})
     monkeypatch.delenv("UCGOV_FIXTURE_ACTOR")
+    monkeypatch.setenv("UCGOV_PLAN_HMAC_KEY", "x" * 32)
     assert_mode_is_safe(Settings(mode=Mode.CONNECTED), {"DATABRICKS_CLIENT_ID": ""})
 
 
 def test_connected_cannot_select_fixture_actor() -> None:
     with pytest.raises(ValidationError, match="cannot be set in connected modes"):
+        Settings(mode=Mode.CONNECTED)
+
+
+@pytest.mark.parametrize("key", ["", "too-short"])
+def test_connected_mode_requires_a_strong_plan_hmac_key(
+    monkeypatch: pytest.MonkeyPatch, key: str
+) -> None:
+    monkeypatch.delenv("UCGOV_FIXTURE_ACTOR")
+    monkeypatch.setenv("UCGOV_PLAN_HMAC_KEY", key)
+    with pytest.raises(ValidationError, match="UCGOV_PLAN_HMAC_KEY must be at least 32"):
         Settings(mode=Mode.CONNECTED)
 
 

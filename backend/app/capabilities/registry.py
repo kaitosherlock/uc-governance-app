@@ -14,6 +14,7 @@ class Declaration:
     domain: str
     requires: tuple[CapabilityRequirement, ...] = ()
     status: CapabilityStatusValue = CapabilityStatusValue.NOT_IMPLEMENTED
+    reason: str | None = None
 
 
 SQL = (CapabilityRequirement.SQL_WAREHOUSE,)
@@ -75,9 +76,16 @@ REGISTRY = (
     Declaration("access_reviews.update", "7.12", STORE),
     Declaration("time_bound_access.update", "7.12", STORE),
     Declaration("admin.metastores", "7.1", ACCOUNT),
-    Declaration("plans.create", "9"),
-    Declaration("plans.execute", "9"),
-    Declaration("operations.reconcile", "9"),
+    # The core and read stores are real. Concrete kinds remain honestly unavailable
+    # until their adapters are registered in P1-05 and later slices.
+    Declaration("plans.lifecycle_core", "9", status=AVAILABLE),
+    Declaration("plans.read", "9", status=AVAILABLE),
+    Declaration("operations.read", "9", status=AVAILABLE),
+    Declaration("plans.create", "9", reason="No concrete plan kind is registered yet."),
+    Declaration("plans.execute", "9", reason="No concrete plan kind is registered yet."),
+    Declaration(
+        "operations.reconcile", "9", reason="No concrete plan kind is registered yet."
+    ),
 )
 
 
@@ -93,7 +101,11 @@ def probe(declaration: Declaration, settings: Settings) -> Capability:
         requirement.value for requirement in declaration.requires if not configured[requirement]
     ]
     status = declaration.status
-    reason = None if status == AVAILABLE else "This capability is not implemented in this version."
+    reason = (
+        None
+        if status == AVAILABLE
+        else declaration.reason or "This capability is not implemented in this version."
+    )
     if missing:
         status = CapabilityStatusValue.NOT_CONFIGURED
         reason = "Missing requirement: " + ", ".join(missing) + "."

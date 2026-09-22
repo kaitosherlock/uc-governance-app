@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Generic, Literal, TypeVar
+from uuid import UUID
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -382,4 +383,148 @@ class PrivilegeListResponse(SuccessResponse[list[Privilege]]):
 
 
 class GrantsResponse(SuccessResponse[GrantsData]):
+    pass
+
+
+class PlanKind(StrEnum):
+    GRANT = "grant"
+    REVOKE = "revoke"
+    TRANSFER_OWNERSHIP = "transfer_ownership"
+    EDIT_METADATA = "edit_metadata"
+    ASSIGN_TAGS = "assign_tags"
+    REMOVE_TAGS = "remove_tags"
+    SET_ROW_FILTER = "set_row_filter"
+    DROP_ROW_FILTER = "drop_row_filter"
+    SET_COLUMN_MASK = "set_column_mask"
+    DROP_COLUMN_MASK = "drop_column_mask"
+    REPLACE_VIEW_DEFINITION = "replace_view_definition"
+    DELETE_ASSET = "delete_asset"
+    UPDATE_BINDING = "update_binding"
+    CREATE_ABAC_POLICY = "create_abac_policy"
+    UPDATE_ABAC_POLICY = "update_abac_policy"
+    DELETE_ABAC_POLICY = "delete_abac_policy"
+    UPDATE_SHARE_PERMISSIONS = "update_share_permissions"
+    UPDATE_RECIPIENT = "update_recipient"
+    CREATE_QUALITY_MONITOR = "create_quality_monitor"
+    REFRESH_QUALITY_MONITOR = "refresh_quality_monitor"
+    APPLY_ACCESS_REQUEST = "apply_access_request"
+
+
+class PlanTarget(ContractModel):
+    securable_type: SecurableType
+    full_name: str
+
+
+class PlanCreateRequest(ContractModel):
+    kind: PlanKind
+    targets: list[PlanTarget] = Field(min_length=1, max_length=50)
+    changes: dict[str, object]
+    reason: str = Field(min_length=3, max_length=200)
+    access_request_id: UUID | None = None
+
+
+class PlanStatus(StrEnum):
+    PREVIEWED = "previewed"
+    CONFIRMED = "confirmed"
+    REVALIDATING = "revalidating"
+    EXECUTING = "executing"
+    APPLIED = "applied"
+    PARTIALLY_APPLIED = "partially_applied"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+    EXPIRED = "expired"
+    STALE = "stale"
+    INVALIDATED = "invalidated"
+
+
+class NormalizedChange(ContractModel):
+    target: AssetRef
+    description: str
+    statement_preview: str
+
+
+class Impact(ContractModel):
+    known: list[str]
+    unknown: list[str]
+
+
+class Plan(ContractModel):
+    id: UUID
+    kind: PlanKind
+    status: PlanStatus
+    identity: Identity
+    workspace_id: str | None
+    environment_label: str
+    targets: list[AssetRef]
+    normalized_changes: list[NormalizedChange]
+    observed_state_hash: str
+    impact: Impact
+    prerequisite_notes: list[str]
+    inheritance_note: str | None
+    requires_typed_confirmation: bool
+    typed_confirmation_value: str | None
+    atomic: bool
+    expires_at: UtcTimestamp
+    confirmation_token: str
+    created_at: UtcTimestamp
+    invalidated_by: UUID | None
+    access_request_id: UUID | None
+
+
+class PlanResponse(SuccessResponse[Plan]):
+    pass
+
+
+class PlanExecuteRequest(ContractModel):
+    confirmation_token: str
+    typed_name: str | None = None
+
+
+class OperationStatus(StrEnum):
+    EXECUTING = "executing"
+    APPLIED = "applied"
+    PARTIALLY_APPLIED = "partially_applied"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+
+
+class TargetOutcomeStatus(StrEnum):
+    PENDING = "pending"
+    APPLIED = "applied"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+    SKIPPED = "skipped"
+
+
+class TargetOutcomeError(ContractModel):
+    code: ErrorCode
+    message: str
+
+
+class TargetOutcome(ContractModel):
+    target: AssetRef
+    status: TargetOutcomeStatus
+    verified: bool
+    verified_at: UtcTimestamp | None
+    databricks_request_id: str | None
+    error: TargetOutcomeError | None
+    summary: str
+
+
+class Operation(ContractModel):
+    id: UUID
+    plan_id: UUID
+    kind: PlanKind
+    status: OperationStatus
+    identity: Identity
+    started_at: UtcTimestamp
+    finished_at: UtcTimestamp | None
+    atomic: bool
+    targets: list[TargetOutcome]
+    reconcile_available: bool
+    summary: str
+    correlation_id: str
+
+
+class OperationResponse(SuccessResponse[Operation]):
     pass

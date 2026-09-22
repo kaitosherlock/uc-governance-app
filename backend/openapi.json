@@ -1177,6 +1177,525 @@
           }
         }
       }
+    },
+    "/api/v1/plans": {
+      "post": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Create Plan",
+        "operationId": "createPlan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plans/{plan_id}": {
+      "get": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Get Plan",
+        "operationId": "getPlan",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plans/{plan_id}/execute": {
+      "post": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Execute Plan",
+        "operationId": "executePlan",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResponse"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/{operation_id}": {
+      "get": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Get Operation",
+        "operationId": "getOperation",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/{operation_id}/reconcile": {
+      "post": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Reconcile Operation",
+        "operationId": "reconcileOperation",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2461,6 +2980,30 @@
         ],
         "title": "IdentityResponse"
       },
+      "Impact": {
+        "properties": {
+          "known": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Known"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "known",
+          "unknown"
+        ],
+        "title": "Impact"
+      },
       "ManagedStatus": {
         "type": "string",
         "enum": [
@@ -2516,6 +3059,28 @@
         ],
         "title": "Meta"
       },
+      "NormalizedChange": {
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/AssetRef"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "statement_preview": {
+            "type": "string",
+            "title": "Statement Preview"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "description",
+          "statement_preview"
+        ],
+        "title": "NormalizedChange"
+      },
       "ObjectKind": {
         "type": "string",
         "enum": [
@@ -2532,6 +3097,118 @@
           "model_version"
         ],
         "title": "ObjectKind"
+      },
+      "Operation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "plan_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Plan Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlanKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OperationStatus"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "atomic": {
+            "type": "boolean",
+            "title": "Atomic"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetOutcome"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "reconcile_available": {
+            "type": "boolean",
+            "title": "Reconcile Available"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "correlation_id": {
+            "type": "string",
+            "title": "Correlation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "plan_id",
+          "kind",
+          "status",
+          "identity",
+          "started_at",
+          "finished_at",
+          "atomic",
+          "targets",
+          "reconcile_available",
+          "summary",
+          "correlation_id"
+        ],
+        "title": "Operation"
+      },
+      "OperationResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Operation"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "OperationResponse"
+      },
+      "OperationStatus": {
+        "type": "string",
+        "enum": [
+          "executing",
+          "applied",
+          "partially_applied",
+          "failed",
+          "unknown"
+        ],
+        "title": "OperationStatus"
       },
       "Page": {
         "properties": {
@@ -2557,6 +3234,313 @@
           "next_page_token"
         ],
         "title": "Page"
+      },
+      "Plan": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlanKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          },
+          "environment_label": {
+            "type": "string",
+            "title": "Environment Label"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRef"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "normalized_changes": {
+            "items": {
+              "$ref": "#/components/schemas/NormalizedChange"
+            },
+            "type": "array",
+            "title": "Normalized Changes"
+          },
+          "observed_state_hash": {
+            "type": "string",
+            "title": "Observed State Hash"
+          },
+          "impact": {
+            "$ref": "#/components/schemas/Impact"
+          },
+          "prerequisite_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prerequisite Notes"
+          },
+          "inheritance_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inheritance Note"
+          },
+          "requires_typed_confirmation": {
+            "type": "boolean",
+            "title": "Requires Typed Confirmation"
+          },
+          "typed_confirmation_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typed Confirmation Value"
+          },
+          "atomic": {
+            "type": "boolean",
+            "title": "Atomic"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "confirmation_token": {
+            "type": "string",
+            "title": "Confirmation Token"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "invalidated_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidated By"
+          },
+          "access_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "identity",
+          "workspace_id",
+          "environment_label",
+          "targets",
+          "normalized_changes",
+          "observed_state_hash",
+          "impact",
+          "prerequisite_notes",
+          "inheritance_note",
+          "requires_typed_confirmation",
+          "typed_confirmation_value",
+          "atomic",
+          "expires_at",
+          "confirmation_token",
+          "created_at",
+          "invalidated_by",
+          "access_request_id"
+        ],
+        "title": "Plan"
+      },
+      "PlanCreateRequest": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/PlanKind"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/PlanTarget"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Targets"
+          },
+          "changes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Changes"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason"
+          },
+          "access_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "targets",
+          "changes",
+          "reason"
+        ],
+        "title": "PlanCreateRequest"
+      },
+      "PlanExecuteRequest": {
+        "properties": {
+          "confirmation_token": {
+            "type": "string",
+            "title": "Confirmation Token"
+          },
+          "typed_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typed Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirmation_token"
+        ],
+        "title": "PlanExecuteRequest"
+      },
+      "PlanKind": {
+        "type": "string",
+        "enum": [
+          "grant",
+          "revoke",
+          "transfer_ownership",
+          "edit_metadata",
+          "assign_tags",
+          "remove_tags",
+          "set_row_filter",
+          "drop_row_filter",
+          "set_column_mask",
+          "drop_column_mask",
+          "replace_view_definition",
+          "delete_asset",
+          "update_binding",
+          "create_abac_policy",
+          "update_abac_policy",
+          "delete_abac_policy",
+          "update_share_permissions",
+          "update_recipient",
+          "create_quality_monitor",
+          "refresh_quality_monitor",
+          "apply_access_request"
+        ],
+        "title": "PlanKind"
+      },
+      "PlanResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "PlanResponse"
+      },
+      "PlanStatus": {
+        "type": "string",
+        "enum": [
+          "previewed",
+          "confirmed",
+          "revalidating",
+          "executing",
+          "applied",
+          "partially_applied",
+          "failed",
+          "unknown",
+          "expired",
+          "stale",
+          "invalidated"
+        ],
+        "title": "PlanStatus"
+      },
+      "PlanTarget": {
+        "properties": {
+          "securable_type": {
+            "$ref": "#/components/schemas/SecurableType"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "securable_type",
+          "full_name"
+        ],
+        "title": "PlanTarget"
       },
       "Principal": {
         "properties": {
@@ -2861,6 +3845,96 @@
           "system"
         ],
         "title": "TagKind"
+      },
+      "TargetOutcome": {
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/AssetRef"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TargetOutcomeStatus"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "databricks_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Databricks Request Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetOutcomeError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "status",
+          "verified",
+          "verified_at",
+          "databricks_request_id",
+          "error",
+          "summary"
+        ],
+        "title": "TargetOutcome"
+      },
+      "TargetOutcomeError": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "TargetOutcomeError"
+      },
+      "TargetOutcomeStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "applied",
+          "failed",
+          "unknown",
+          "skipped"
+        ],
+        "title": "TargetOutcomeStatus"
       },
       "ValidationError": {
         "properties": {

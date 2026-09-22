@@ -5,11 +5,13 @@ from pathlib import Path
 
 from app.config.settings import Mode, Settings
 from app.domain.reads import Readers
+from app.mutations.core import MutationEngine
 
 
 class Container:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self.mutation_engine = MutationEngine(settings)
         self.fixture_readers: Readers | None = None
         from app.adapters.databricks.common import CursorStore
 
