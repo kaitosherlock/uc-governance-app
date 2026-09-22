@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import type { AssetDetail, Meta } from "@contracts/types";
 import {
   Check,
@@ -17,6 +18,7 @@ import { strings } from "@/lib/strings";
 import { AssetActionControl } from "./AssetActionControl";
 import { AssetColumnsTable } from "./AssetColumnsTable";
 import { AssetDependenciesView } from "./AssetDependenciesView";
+import { AssetGrantsView } from "./AssetGrantsView";
 import { ErrorView, LimitationsView, LocalizedSkeleton } from "./StateViews";
 import { UnknownBadge } from "./UnknownBadge";
 
@@ -60,6 +62,18 @@ const KNOWN_OBJECT_KINDS = new Set<string>([
 export function AssetOverview({ asset, meta, onRefresh }: AssetOverviewProps) {
   const [copiedFqn, setCopiedFqn] = useState(false);
   const [copiedLocation, setCopiedLocation] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get("tab") || "overview";
+
+  function handleTabChange(tabKey: string) {
+    const next = new URLSearchParams(searchParams);
+    if (tabKey === "overview") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tabKey);
+    }
+    setSearchParams(next);
+  }
 
   // Fetch dependencies for this asset
   const dependenciesQuery = useAssetDependencies(asset.securable_type, asset.full_name);
@@ -318,111 +332,155 @@ export function AssetOverview({ asset, meta, onRefresh }: AssetOverviewProps) {
         ) : null}
       </div>
 
-      {/* Tags section */}
-      <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)] space-y-3">
-        <div className="flex items-center gap-2">
-          <TagIcon className="w-4 h-4 text-[var(--color-icon-muted)]" aria-hidden="true" />
-          <h3 className="text-[var(--text-md)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
-            {strings.assets.tags.title}
-          </h3>
-          <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
-            ({asset.tags.length})
-          </span>
-        </div>
+      {/* Tabs strip */}
+      <div
+        role="tablist"
+        aria-label={strings.access.tabsAriaLabel}
+        className="flex items-center gap-1 border-b border-[var(--color-border-subtle)]"
+      >
+        <button
+          role="tab"
+          type="button"
+          aria-selected={currentTab === "overview"}
+          onClick={() => handleTabChange("overview")}
+          className={`px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] ${
+            currentTab === "overview"
+              ? "border-[var(--color-accent)] text-[var(--color-accent)] font-[var(--weight-semibold)]"
+              : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+          }`}
+        >
+          {strings.assets.tabs.overview}
+        </button>
+        <button
+          role="tab"
+          type="button"
+          aria-selected={currentTab === "access"}
+          onClick={() => handleTabChange("access")}
+          className={`px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] ${
+            currentTab === "access"
+              ? "border-[var(--color-accent)] text-[var(--color-accent)] font-[var(--weight-semibold)]"
+              : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+          }`}
+        >
+          {strings.assets.tabs.access}
+        </button>
+      </div>
 
-        {asset.tags.length === 0 ? (
-          <p className="text-[var(--text-sm)] text-[var(--color-text-secondary)] italic">
-            {strings.assets.tags.empty}
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {asset.tags.map((tag) => (
-              <div
-                key={tag.key}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-control)] border text-[var(--text-xs)] font-[var(--font-mono)] bg-[var(--color-neutral-1)] border-[var(--color-border-subtle)]"
-              >
-                <span className="font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
-                  {tag.key}
-                </span>
-                {tag.value ? (
-                  <span className="text-[var(--color-text-secondary)]">={tag.value}</span>
-                ) : null}
-                <span
-                  className={`text-[10px] px-1 py-[1px] rounded font-sans uppercase font-[var(--weight-medium)] ${
-                    tag.kind === "governed"
-                      ? "bg-[var(--color-accent-light)] text-[var(--color-accent)] font-semibold"
-                      : tag.kind === "system"
-                        ? "bg-[var(--color-neutral-3)] text-[var(--color-text-muted)]"
-                        : "bg-[var(--color-neutral-2)] text-[var(--color-text-secondary)]"
-                  }`}
-                >
-                  {tag.kind}
-                </span>
+      {currentTab === "access" ? (
+        <AssetGrantsView
+          securableType={asset.securable_type}
+          fullName={asset.full_name}
+          onRefresh={onRefresh}
+        />
+      ) : (
+        <>
+          {/* Tags section */}
+          <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)] space-y-3">
+            <div className="flex items-center gap-2">
+              <TagIcon className="w-4 h-4 text-[var(--color-icon-muted)]" aria-hidden="true" />
+              <h3 className="text-[var(--text-md)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+                {strings.assets.tags.title}
+              </h3>
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+                ({asset.tags.length})
+              </span>
+            </div>
+
+            {asset.tags.length === 0 ? (
+              <p className="text-[var(--text-sm)] text-[var(--color-text-secondary)] italic">
+                {strings.assets.tags.empty}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {asset.tags.map((tag) => (
+                  <div
+                    key={tag.key}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-control)] border text-[var(--text-xs)] font-[var(--font-mono)] bg-[var(--color-neutral-1)] border-[var(--color-border-subtle)]"
+                  >
+                    <span className="font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+                      {tag.key}
+                    </span>
+                    {tag.value ? (
+                      <span className="text-[var(--color-text-secondary)]">={tag.value}</span>
+                    ) : null}
+                    <span
+                      className={`text-[10px] px-1 py-[1px] rounded font-sans uppercase font-[var(--weight-medium)] ${
+                        tag.kind === "governed"
+                          ? "bg-[var(--color-accent-light)] text-[var(--color-accent)] font-semibold"
+                          : tag.kind === "system"
+                            ? "bg-[var(--color-neutral-3)] text-[var(--color-text-muted)]"
+                            : "bg-[var(--color-neutral-2)] text-[var(--color-text-secondary)]"
+                      }`}
+                    >
+                      {tag.kind}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Columns table */}
-      <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)] space-y-3">
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-[var(--color-icon-muted)]" aria-hidden="true" />
-          <h3 className="text-[var(--text-md)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
-            {strings.assets.columnsTable.title}
-          </h3>
-          <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
-            ({asset.columns.length})
-          </span>
-        </div>
-        <AssetColumnsTable columns={asset.columns} />
-      </div>
-
-      {/* Dependencies Section */}
-      <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)]">
-        {dependenciesQuery.isLoading ? (
-          <div className="space-y-3">
-            <LocalizedSkeleton className="h-6 w-48" />
-            <LocalizedSkeleton className="h-24 w-full" />
+          {/* Columns table */}
+          <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)] space-y-3">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[var(--color-icon-muted)]" aria-hidden="true" />
+              <h3 className="text-[var(--text-md)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+                {strings.assets.columnsTable.title}
+              </h3>
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+                ({asset.columns.length})
+              </span>
+            </div>
+            <AssetColumnsTable columns={asset.columns} />
           </div>
-        ) : dependenciesQuery.isError ? (
-          <ErrorView
-            error={dependenciesQuery.error}
-            onRetry={() => dependenciesQuery.refetch()}
-          />
-        ) : dependenciesQuery.data?.data ? (
-          <AssetDependenciesView dependencies={dependenciesQuery.data.data} />
-        ) : null}
-      </div>
 
-      {/* View Definition if present */}
-      {asset.view_definition ? (
-        <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)] space-y-2">
-          <h3 className="text-[var(--text-md)] font-[var(--weight-semibold)] text-[var(--color-text-primary)] flex items-center gap-2">
-            <FileCode2 className="w-4 h-4 text-[var(--color-icon-muted)]" aria-hidden="true" />
-            {strings.assets.fields.viewDefinition}
-          </h3>
-          <pre className="p-3 bg-[var(--color-neutral-1)] border border-[var(--color-border-subtle)] rounded font-[var(--font-mono)] text-[var(--text-xs)] text-[var(--color-text-primary)] overflow-x-auto">
-            <code>{asset.view_definition}</code>
-          </pre>
-        </div>
-      ) : null}
+          {/* Dependencies Section */}
+          <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)]">
+            {dependenciesQuery.isLoading ? (
+              <div className="space-y-3">
+                <LocalizedSkeleton className="h-6 w-48" />
+                <LocalizedSkeleton className="h-24 w-full" />
+              </div>
+            ) : dependenciesQuery.isError ? (
+              <ErrorView
+                error={dependenciesQuery.error}
+                onRetry={() => dependenciesQuery.refetch()}
+              />
+            ) : dependenciesQuery.data?.data ? (
+              <AssetDependenciesView dependencies={dependenciesQuery.data.data} />
+            ) : null}
+          </div>
 
-      {/* Raw JSON technical details */}
-      {asset.raw && Object.keys(asset.raw).length > 0 ? (
-        <details className="p-[var(--space-4)] bg-[var(--color-neutral-1)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] text-[var(--text-xs)] text-[var(--color-text-secondary)]">
-          <summary className="cursor-pointer font-[var(--weight-medium)] text-[var(--color-text-primary)] flex items-center gap-1.5 hover:underline focus:outline-none">
-            <Code2 className="w-3.5 h-3.5 text-[var(--color-icon-muted)]" aria-hidden="true" />
-            <span>{strings.assets.states.detailsHeading}</span>
-          </summary>
-          <pre className="mt-3 p-3 bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded font-[var(--font-mono)] text-[11px] text-[var(--color-text-primary)] overflow-x-auto max-h-80">
-            <code>{JSON.stringify(asset.raw, null, 2)}</code>
-          </pre>
-        </details>
-      ) : null}
+          {/* View Definition if present */}
+          {asset.view_definition ? (
+            <div className="p-[var(--space-5)] bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] shadow-[var(--shadow-panel)] space-y-2">
+              <h3 className="text-[var(--text-md)] font-[var(--weight-semibold)] text-[var(--color-text-primary)] flex items-center gap-2">
+                <FileCode2 className="w-4 h-4 text-[var(--color-icon-muted)]" aria-hidden="true" />
+                {strings.assets.fields.viewDefinition}
+              </h3>
+              <pre className="p-3 bg-[var(--color-neutral-1)] border border-[var(--color-border-subtle)] rounded font-[var(--font-mono)] text-[var(--text-xs)] text-[var(--color-text-primary)] overflow-x-auto">
+                <code>{asset.view_definition}</code>
+              </pre>
+            </div>
+          ) : null}
 
-      {/* Meta limitations and completeness notice */}
-      <LimitationsView meta={meta} />
+          {/* Raw JSON technical details */}
+          {asset.raw && Object.keys(asset.raw).length > 0 ? (
+            <details className="p-[var(--space-4)] bg-[var(--color-neutral-1)] border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] text-[var(--text-xs)] text-[var(--color-text-secondary)]">
+              <summary className="cursor-pointer font-[var(--weight-medium)] text-[var(--color-text-primary)] flex items-center gap-1.5 hover:underline focus:outline-none">
+                <Code2 className="w-3.5 h-3.5 text-[var(--color-icon-muted)]" aria-hidden="true" />
+                <span>{strings.assets.states.detailsHeading}</span>
+              </summary>
+              <pre className="mt-3 p-3 bg-[var(--color-neutral-0)] border border-[var(--color-border-subtle)] rounded font-[var(--font-mono)] text-[11px] text-[var(--color-text-primary)] overflow-x-auto max-h-80">
+                <code>{JSON.stringify(asset.raw, null, 2)}</code>
+              </pre>
+            </details>
+          ) : null}
+
+          {/* Meta limitations and completeness notice */}
+          <LimitationsView meta={meta} />
+        </>
+      )}
     </div>
   );
 }

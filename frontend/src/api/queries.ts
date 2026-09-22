@@ -12,9 +12,11 @@ import type {
   Capability,
   Context,
   DependenciesData,
+  GrantsData,
   Identity,
   ObjectKind,
   PagedResponse,
+  Privilege,
   SecurableType,
   SuccessResponse,
 } from "@contracts/types";
@@ -331,3 +333,82 @@ export function useAssetDependencies(
     },
   });
 }
+
+export interface AssetGrantsQueryOptions {
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch grants for an asset (direct + inherited). */
+export function useAssetGrants(
+  securableType: SecurableType | string | null | undefined,
+  fullName: string | null | undefined,
+  options?: AssetGrantsQueryOptions,
+) {
+  return useQuery<SuccessResponse<GrantsData>, unknown>({
+    queryKey: [
+      "grants",
+      securableType ?? null,
+      fullName ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!securableType || !fullName) {
+        throw new Error("securableType and fullName are required");
+      }
+      return apiGet<GrantsData>(API_PATHS.assetGrants, {
+        params: { securable_type: securableType, full_name: fullName },
+        signal,
+      });
+    },
+    enabled: Boolean(securableType && fullName) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry(failureCount, error) {
+      if (isClientError(error)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export interface PrivilegesQueryOptions {
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch privilege catalogue for a securable type. */
+export function usePrivileges(
+  securableType: SecurableType | string | null | undefined,
+  options?: PrivilegesQueryOptions,
+) {
+  return useQuery<SuccessResponse<Privilege[]>, unknown>({
+    queryKey: [
+      "privileges",
+      securableType ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!securableType) {
+        throw new Error("securableType is required");
+      }
+      return apiGet<Privilege[]>(API_PATHS.privileges, {
+        query: { securable_type: securableType },
+        signal,
+      });
+    },
+    enabled: Boolean(securableType) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry(failureCount, error) {
+      if (isClientError(error)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+

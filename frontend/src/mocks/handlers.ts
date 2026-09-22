@@ -17,6 +17,7 @@ import errorValidationFailed from "../../../shared/contracts/examples/ErrorRespo
 import identityFixture from "../../../shared/contracts/examples/IdentityResponse.steward.json";
 import operationUnknownOutcome from "../../../shared/contracts/examples/OperationResponse.unknown-outcome.json";
 import schemaObjectsFixture from "../../../shared/contracts/examples/AssetListResponse.list-schema-objects.json";
+import grantsFixture from "../../../shared/contracts/examples/GrantsResponse.orders-table.json";
 
 const capabilitiesFixture = {
   success: true,
@@ -533,6 +534,103 @@ export const handlers = [
     }
 
     return HttpResponse.json(dependenciesFixture);
+  }),
+
+  http.get("*/api/v1/assets/:securable_type/:full_name/grants", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario);
+    if (scenarioRes) return scenarioRes;
+
+    if (scenario === "empty") {
+      return HttpResponse.json({
+        ...grantsFixture,
+        data: {
+          ...grantsFixture.data,
+          direct: [],
+          inherited: [],
+        },
+      });
+    }
+
+    if (scenario === "unknown-privilege") {
+      return HttpResponse.json({
+        ...grantsFixture,
+        data: {
+          ...grantsFixture.data,
+          direct: [
+            ...grantsFixture.data.direct,
+            {
+              principal: "auditors",
+              principal_kind: "group",
+              privilege: "CUSTOM_UNKNOWN_PRIVILEGE",
+              source: {
+                type: "direct",
+                securable_type: "TABLE",
+                full_name: "sales.crm.orders",
+              },
+              allowed_actions: [],
+            },
+          ],
+        },
+      });
+    }
+
+    return HttpResponse.json(grantsFixture);
+  }),
+
+  http.get("*/api/v1/privileges", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario);
+    if (scenarioRes) return scenarioRes;
+
+    return HttpResponse.json({
+      success: true,
+      data: [
+        {
+          code: "SELECT",
+          label: "Read data",
+          description: "Read data on the listed securable types.",
+          category: "read",
+          securable_types: ["TABLE", "VIEW"],
+          prerequisites: ["USE_CATALOG", "USE_SCHEMA"],
+        },
+        {
+          code: "MODIFY",
+          label: "Modify data",
+          description: "Modify data on the listed securable types.",
+          category: "write",
+          securable_types: ["TABLE"],
+          prerequisites: ["USE_CATALOG", "USE_SCHEMA"],
+        },
+        {
+          code: "USE_CATALOG",
+          label: "Use catalog",
+          description: "Use this catalog as a parent prerequisite.",
+          category: "use",
+          securable_types: ["CATALOG"],
+          prerequisites: [],
+        },
+        {
+          code: "USE_SCHEMA",
+          label: "Use schema",
+          description: "Use this schema as a parent prerequisite.",
+          category: "use",
+          securable_types: ["SCHEMA"],
+          prerequisites: ["USE_CATALOG"],
+        },
+      ],
+      meta: {
+        source: "fixture",
+        observed_at: "2026-09-21T09:00:00Z",
+        completeness: "complete",
+        limitations: [
+          "Privilege codes follow SDK 0.140.0. Applicability is a versioned catalogue; runtime grant authority is not inferred.",
+        ],
+        correlation_id: "c0ffee00-0000-4000-8000-000000000020",
+      },
+    });
   }),
 
   http.get("*/api/v1/assets/:securable_type/:full_name", async ({ request }) => {

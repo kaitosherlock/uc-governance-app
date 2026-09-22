@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { Database, FolderTree, PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
 import {
   useAsset,
@@ -10,6 +10,7 @@ import {
 import { PageHeader } from "@/app/PageHeader";
 import { strings } from "@/lib/strings";
 import { AssetBreadcrumbs } from "./AssetBreadcrumbs";
+import { AssetGrantsView } from "./AssetGrantsView";
 import { AssetOverview } from "./AssetOverview";
 import { AssetSearch } from "./AssetSearch";
 import { AssetTree } from "./AssetTree";
@@ -27,6 +28,8 @@ export function DataAssetsView() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [treeOpenOnMobile, setTreeOpenOnMobile] = useState(false);
+  const [searchParams] = useSearchParams();
+  const currentTab = searchParams.get("tab");
 
   // Derive FQN for object if selected
   const objectFullName =
@@ -180,7 +183,43 @@ export function DataAssetsView() {
             ) : null
           ) : /* 2. Schema Route */
           catalog && schema ? (
-            schemaObjectsQuery.isLoading ? (
+            currentTab === "access" ? (
+              <div className="p-[var(--space-6)] space-y-4">
+                <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
+                  <FolderTree className="w-5 h-5 text-[var(--color-icon-muted)]" aria-hidden="true" />
+                  <span className="font-[var(--font-mono)] text-[var(--text-sm)]">
+                    {catalog}.{schema}
+                  </span>
+                </div>
+                <div
+                  role="tablist"
+                  aria-label={strings.access.tabsAriaLabel}
+                  className="flex items-center gap-1 border-b border-[var(--color-border-subtle)]"
+                >
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}/${encodeURIComponent(schema)}`}
+                    role="tab"
+                    aria-selected={false}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    {strings.assets.objectsTitle}
+                  </Link>
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}/${encodeURIComponent(schema)}?tab=access`}
+                    role="tab"
+                    aria-selected={true}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-semibold)] border-b-2 -mb-px border-[var(--color-accent)] text-[var(--color-accent)]"
+                  >
+                    {strings.assets.tabs.access}
+                  </Link>
+                </div>
+                <AssetGrantsView
+                  securableType="SCHEMA"
+                  fullName={`${catalog}.${schema}`}
+                  onRefresh={() => schemaObjectsQuery.refetch()}
+                />
+              </div>
+            ) : schemaObjectsQuery.isLoading ? (
               <div className="p-[var(--space-6)] space-y-4">
                 <LocalizedSkeleton className="h-8 w-48" />
                 <LocalizedSkeleton className="h-64 w-full" />
@@ -200,6 +239,28 @@ export function DataAssetsView() {
                     {catalog}.{schema}
                   </span>
                 </div>
+                <div
+                  role="tablist"
+                  aria-label={strings.access.tabsAriaLabel}
+                  className="flex items-center gap-1 border-b border-[var(--color-border-subtle)]"
+                >
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}/${encodeURIComponent(schema)}`}
+                    role="tab"
+                    aria-selected={true}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-semibold)] border-b-2 -mb-px border-[var(--color-accent)] text-[var(--color-accent)]"
+                  >
+                    {strings.assets.objectsTitle}
+                  </Link>
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}/${encodeURIComponent(schema)}?tab=access`}
+                    role="tab"
+                    aria-selected={false}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    {strings.assets.tabs.access}
+                  </Link>
+                </div>
                 <SchemaObjectsTable
                   catalog={catalog}
                   schema={schema}
@@ -210,7 +271,43 @@ export function DataAssetsView() {
             ) : null
           ) : /* 3. Catalog Route */
           catalog ? (
-            schemasQuery.isLoading ? (
+            currentTab === "access" ? (
+              <div className="p-[var(--space-6)] space-y-4">
+                <div className="flex items-center gap-2 text-[var(--color-text-secondary)]">
+                  <Database className="w-5 h-5 text-[var(--color-icon-muted)]" aria-hidden="true" />
+                  <span className="font-[var(--font-mono)] text-[var(--text-sm)]">
+                    {catalog}
+                  </span>
+                </div>
+                <div
+                  role="tablist"
+                  aria-label={strings.access.tabsAriaLabel}
+                  className="flex items-center gap-1 border-b border-[var(--color-border-subtle)]"
+                >
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}`}
+                    role="tab"
+                    aria-selected={false}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    {strings.assets.schemasTitle}
+                  </Link>
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}?tab=access`}
+                    role="tab"
+                    aria-selected={true}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-semibold)] border-b-2 -mb-px border-[var(--color-accent)] text-[var(--color-accent)]"
+                  >
+                    {strings.assets.tabs.access}
+                  </Link>
+                </div>
+                <AssetGrantsView
+                  securableType="CATALOG"
+                  fullName={catalog}
+                  onRefresh={() => schemasQuery.refetch()}
+                />
+              </div>
+            ) : schemasQuery.isLoading ? (
               <div className="p-[var(--space-6)] space-y-4">
                 <LocalizedSkeleton className="h-8 w-48" />
                 <LocalizedSkeleton className="h-64 w-full" />
@@ -229,6 +326,28 @@ export function DataAssetsView() {
                   <span className="font-[var(--font-mono)] text-[var(--text-sm)]">
                     {catalog}
                   </span>
+                </div>
+                <div
+                  role="tablist"
+                  aria-label={strings.access.tabsAriaLabel}
+                  className="flex items-center gap-1 border-b border-[var(--color-border-subtle)]"
+                >
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}`}
+                    role="tab"
+                    aria-selected={true}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-semibold)] border-b-2 -mb-px border-[var(--color-accent)] text-[var(--color-accent)]"
+                  >
+                    {strings.assets.schemasTitle}
+                  </Link>
+                  <Link
+                    to={`/assets/${encodeURIComponent(catalog)}?tab=access`}
+                    role="tab"
+                    aria-selected={false}
+                    className="px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  >
+                    {strings.assets.tabs.access}
+                  </Link>
                 </div>
                 <CatalogSchemasTable
                   catalog={catalog}
