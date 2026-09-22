@@ -1,0 +1,23 @@
+{
+    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T094604Z-backend-P1-09.log",
+    "tier":  "tier_reasoning",
+    "agent":  "backend",
+    "session_id":  "01a0c882-1f8a-70c3-be7f-84bfa68ecae5",
+    "finished_at":  "2026-09-22T09:54:57.3629142Z",
+    "seconds":  533,
+    "prompt_chars":  5675,
+    "started_at":  "2026-09-22T09:46:04.7202717Z",
+    "quota_pattern":  "",
+    "model":  "gpt-5.6-terra",
+    "last_message_excerpt":  "Completed P1-09.\n\n- Added 25 adversarial HTTP tests in [test_security_surface.py](C:/Users/admin/Downloads/uc-governance-app/backend/tests/api/test_security_surface.py).\n- Fixed scope denials being mislabeled as `FORBIDDEN_ROLE`; they now return `FORBIDDEN_SCOPE`.\n- Fixed read-only mode allowing reconciliation; it now rejects before operation-store/read-back access.\n\nVerified:\n\n- `ruff check backend` â€” clean\n- `mypy backend/app` â€” clean, 56 files\n- API + unit tests â€” 197 passed\n\nFull `backend/tests` collection could not run because the sandbox denies access to jsonschemaâ€™s installed metaschema file. The frozen contract uses `DUPLICATE_SUBMISSION` and `PLAN_TAMPERED`; tests follow those codes rather than the dispatchâ€™s differing terminology.",
+    "history":  [
+                    "2026-09-22T09:46:04.7343173Z dispatched",
+                    "2026-09-22T09:54:57.3895399Z completed"
+                ],
+    "task_id":  "P1-09",
+    "status":  "completed",
+    "effort":  "high",
+    "exit_code":  0,
+    "attempt":  1,
+    "prompt_file":  ".ai/prompts/P1-09.md"
+}

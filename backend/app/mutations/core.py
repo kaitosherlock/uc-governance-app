@@ -13,12 +13,13 @@ from uuid import uuid4
 
 from app.api.v1 import models as w
 from app.authz.roles import Target, decide
-from app.config.settings import Settings
+from app.config.settings import Mode, Settings
 from app.domain.names import parts
 from app.errors import (
     AppError,
     DuplicateSubmission,
     ForbiddenRole,
+    ForbiddenScope,
     ModeReadOnly,
     NotFound,
     NotImplementedYet,
@@ -179,6 +180,8 @@ class MutationEngine:
             if not decision.allowed:
                 if decision.reason_code == w.ErrorCode.MODE_READ_ONLY:
                     raise ModeReadOnly(decision.reason)
+                if decision.reason_code == w.ErrorCode.FORBIDDEN_SCOPE:
+                    raise ForbiddenScope(decision.reason)
                 raise ForbiddenRole(decision.reason)
 
     def _binding(self, plan: w.Plan) -> dict[str, object]:
@@ -454,12 +457,24 @@ class MutationEngine:
         return operation
 
     def reconcile(self, operation_id: str, identity: w.Identity) -> w.Operation:
+        # Reconciliation may change the persisted operation state; it is never available in a
+        # read-only deployment, even when the existing operation is already terminal.
+        if self.settings.mode == Mode.CONNECTED_READONLY:
+            raise ModeReadOnly()
         operation = self.get_operation(operation_id, identity)
         if operation.status != w.OperationStatus.UNKNOWN:
             return operation
         stored = self.store.get_plan(str(operation.plan_id))
         if stored is None:
             raise NotFound()
+        self._authorize(
+            identity,
+            operation.kind,
+            [
+                w.PlanTarget(securable_type=target.securable_type, full_name=target.full_name)
+                for target in stored.plan.targets
+            ],
+        )
         handler = self.registry.get(operation.kind)
         outcomes: list[w.TargetOutcome] = []
         for outcome in operation.targets:
