@@ -47,6 +47,15 @@ def map_Tag(value: d.Tag) -> w.Tag:
     )
 
 
+def map_TagPolicy(value: d.TagPolicy) -> w.TagPolicy:
+    return w.TagPolicy(
+        key=value.key,
+        description=value.description,
+        allowed_values=list(value.allowed_values) if value.allowed_values is not None else None,
+        allowed_actions=[map_AllowedAction(x) for x in value.allowed_actions],
+    )
+
+
 def map_RowFilterRef(value: d.RowFilterRef) -> w.RowFilterRef:
     return w.RowFilterRef(
         function_full_name=value.function_full_name,

@@ -5,7 +5,7 @@
  * Configured with sensible staleTime, retry disabling for 4xx errors,
  * and passes the query's AbortSignal to the API client.
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AssetDetail,
   AssetSummary,
@@ -30,6 +30,34 @@ import { isClientError } from "./errors";
 
 const DEFAULT_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Hook to resolve retry logic:
+ * - If QueryClient or query options explicitly specify retry (e.g. retry: false in tests), honor it.
+ * - Suppress retries on 4xx client errors (isClientError).
+ * - Otherwise default to retrying up to 3 times for network or 5xx server errors.
+ */
+function useDefaultRetry(
+  customRetry?: boolean | number | ((failureCount: number, error: unknown) => boolean) | undefined,
+) {
+  const queryClient = useQueryClient();
+  const defaultRetryOption = queryClient.getDefaultOptions().queries?.retry;
+
+  return (failureCount: number, error: unknown): boolean => {
+    if (customRetry === false || customRetry === 0) return false;
+    if (defaultRetryOption === false || defaultRetryOption === 0) return false;
+    if (isClientError(error)) return false;
+    if (typeof customRetry === "number") return failureCount < customRetry;
+    if (typeof customRetry === "function") {
+      return error instanceof Error ? Boolean(customRetry(failureCount, error)) : false;
+    }
+    if (typeof defaultRetryOption === "number") return failureCount < defaultRetryOption;
+    if (typeof defaultRetryOption === "function") {
+      return error instanceof Error ? Boolean(defaultRetryOption(failureCount, error)) : false;
+    }
+    return failureCount < 3;
+  };
+}
+
 export interface ScopeKey {
   catalog: string | null;
   schema: string | null;
@@ -43,14 +71,12 @@ export interface QueryScopeContext {
 
 /** Hook to fetch application context (workspace, mode, managed scope). */
 export function useAppContext() {
+  const retry = useDefaultRetry();
   return useQuery<SuccessResponse<Context>, unknown>({
     queryKey: ["context", { actorId: null, workspaceId: null, scope: null }],
     queryFn: ({ signal }) => apiGet<Context>(API_PATHS.context, { signal }),
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -59,14 +85,12 @@ export const useContext = useAppContext;
 
 /** Hook to fetch actor identity and executor. */
 export function useMe() {
+  const retry = useDefaultRetry();
   return useQuery<SuccessResponse<Identity>, unknown>({
     queryKey: ["me", { actorId: null, workspaceId: null, scope: null }],
     queryFn: ({ signal }) => apiGet<Identity>(API_PATHS.me, { signal }),
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -88,6 +112,7 @@ export function useCapabilities(
     actorId = actorIdOrContext;
   }
 
+  const retry = useDefaultRetry();
   return useQuery<SuccessResponse<Capability[]>, unknown>({
     queryKey: [
       "capabilities",
@@ -100,10 +125,7 @@ export function useCapabilities(
     queryFn: ({ signal }) =>
       apiGet<Capability[]>(API_PATHS.capabilities, { signal }),
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -118,6 +140,7 @@ export interface CatalogsQueryOptions {
 
 /** Hook to fetch catalogs visible to executing identity. */
 export function useCatalogs(options?: CatalogsQueryOptions) {
+  const retry = useDefaultRetry();
   return useQuery<PagedResponse<AssetSummary>, unknown>({
     queryKey: [
       "catalogs",
@@ -143,10 +166,7 @@ export function useCatalogs(options?: CatalogsQueryOptions) {
     },
     enabled: options?.enabled !== false,
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -164,6 +184,7 @@ export function useSchemas(
   catalog: string | null | undefined,
   options?: SchemasQueryOptions,
 ) {
+  const retry = useDefaultRetry();
   return useQuery<PagedResponse<AssetSummary>, unknown>({
     queryKey: [
       "schemas",
@@ -193,10 +214,7 @@ export function useSchemas(
     },
     enabled: Boolean(catalog) && options?.enabled !== false,
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -217,6 +235,7 @@ export function useSchemaObjects(
   schema: string | null | undefined,
   options?: SchemaObjectsQueryOptions,
 ) {
+  const retry = useDefaultRetry();
   return useQuery<PagedResponse<AssetSummary>, unknown>({
     queryKey: [
       "schemaObjects",
@@ -253,10 +272,7 @@ export function useSchemaObjects(
     },
     enabled: Boolean(catalog && schema) && options?.enabled !== false,
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -271,6 +287,7 @@ export function useAsset(
   fullName: string | null | undefined,
   options?: AssetQueryOptions,
 ) {
+  const retry = useDefaultRetry();
   return useQuery<SuccessResponse<AssetDetail>, unknown>({
     queryKey: [
       "asset",
@@ -292,10 +309,7 @@ export function useAsset(
     },
     enabled: Boolean(securableType && fullName),
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -310,6 +324,7 @@ export function useAssetDependencies(
   fullName: string | null | undefined,
   options?: AssetDependenciesQueryOptions,
 ) {
+  const retry = useDefaultRetry();
   return useQuery<SuccessResponse<DependenciesData>, unknown>({
     queryKey: [
       "assetDependencies",
@@ -331,10 +346,7 @@ export function useAssetDependencies(
     },
     enabled: Boolean(securableType && fullName),
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -350,6 +362,7 @@ export function useAssetGrants(
   fullName: string | null | undefined,
   options?: AssetGrantsQueryOptions,
 ) {
+  const retry = useDefaultRetry();
   return useQuery<SuccessResponse<GrantsData>, unknown>({
     queryKey: [
       "grants",
@@ -371,10 +384,7 @@ export function useAssetGrants(
     },
     enabled: Boolean(securableType && fullName) && options?.enabled !== false,
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 
@@ -389,6 +399,7 @@ export function usePrivileges(
   securableType: SecurableType | string | null | undefined,
   options?: PrivilegesQueryOptions,
 ) {
+  const retry = useDefaultRetry();
   return useQuery<SuccessResponse<Privilege[]>, unknown>({
     queryKey: [
       "privileges",
@@ -409,10 +420,7 @@ export function usePrivileges(
     },
     enabled: Boolean(securableType) && options?.enabled !== false,
     staleTime: DEFAULT_STALE_TIME,
-    retry(failureCount, error) {
-      if (isClientError(error)) return false;
-      return failureCount < 3;
-    },
+    retry,
   });
 }
 

@@ -102,13 +102,21 @@ function ContextBarSkeleton() {
 function ContextBarError({ error }: { error: ErrorDescription }) {
   return (
     <header
-      className="flex items-center justify-between min-h-12 px-[var(--space-4)] py-2 border-b border-[var(--color-danger)] bg-[var(--color-danger-bg)] text-[var(--color-danger)] text-[var(--text-sm)]"
+      className="flex items-center justify-between min-h-12 px-[var(--space-4)] py-2 border-b border-[var(--color-danger)] bg-[var(--color-danger-bg)] text-[var(--color-danger)] text-[var(--text-sm)] gap-2 flex-wrap"
       aria-label={strings.context.barLabel}
       role="banner"
     >
-      <div className="flex items-center gap-[var(--space-2)] flex-wrap">
-        <span className="font-[var(--weight-medium)]">{error.title}:</span>
-        <span>{error.body}</span>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-[var(--space-2)] flex-wrap">
+          <span className="font-[var(--weight-medium)]">{error.title}:</span>
+          <span>{error.body}</span>
+        </div>
+        {error.nextSteps.length > 0 ? (
+          <div className="text-[var(--text-xs)] text-[var(--color-text-secondary)] flex items-center gap-1 flex-wrap">
+            <span className="font-[var(--weight-medium)]">{strings.errors.nextStepsPrefix}</span>
+            <span>{error.nextSteps.join("; ")}</span>
+          </div>
+        ) : null}
       </div>
       {error.correlationId && (
         <details className="text-[var(--text-xs)] text-[var(--color-text-muted)] cursor-pointer">

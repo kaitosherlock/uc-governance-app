@@ -1,0 +1,23 @@
+{
+    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T124836Z-backend-P1-ERR-backend.log",
+    "tier":  "tier_standard",
+    "agent":  "backend",
+    "session_id":  "01a0c929-3ad7-7583-928b-09ea333391ec",
+    "finished_at":  "2026-09-22T12:56:26.5544268Z",
+    "seconds":  469,
+    "prompt_chars":  4167,
+    "started_at":  "2026-09-22T12:48:36.9883873Z",
+    "quota_pattern":  "",
+    "model":  "gpt-5.6-terra",
+    "last_message_excerpt":  "Implemented actionable upstream permission errors.\n\n- SDK 403s now name the safe executor role, operation, and securable.\n- User-executor errors identify the relevant OAuth scope when known (`catalog.catalogs`, `catalog.schemas`, `catalog.tables`).\n- Service-principal errors provide qualified UC privilege/admin-grant guidance.\n- No SDK exception text, token, host, or stack content is used.\n- Added focused translation, remediation-difference, secrecy, lazy-call-context, and envelope tests.\n\nChanged [common.py](C:\\Users\\admin\\Downloads\\uc-governance-app\\backend\\app\\adapters\\databricks\\common.py) and [factory.py](C:\\Users\\admin\\Downloads\\uc-governance-app\\backend\\app\\adapters\\databricks\\factory.py), with tests in [test_exception_translation.py](C:\\Users\\admin\\Downloads\\uc-governance-app\\backend\\tests\\unit\\test_exception_translation.py).\n\nVerification: focused tests passed: 18 passed. `common.py` targeted Mypy passed. Full Pytest remains sandbox-blocked reading jsonschema package data; full Ruff/Mypy currently fail due unrelated in-progress P2 tag changes.",
+    "history":  [
+                    "2026-09-22T12:48:37.0057710Z dispatched",
+                    "2026-09-22T12:56:26.5793395Z completed"
+                ],
+    "task_id":  "P1-ERR-backend",
+    "status":  "completed",
+    "effort":  "medium",
+    "exit_code":  0,
+    "attempt":  1,
+    "prompt_file":  ".ai/prompts/P1-ERR-backend.md"
+}

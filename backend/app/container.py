@@ -33,6 +33,7 @@ class Container:
                 grants=adapter,
                 principals=adapter,
                 dependencies=adapter,
+                tags=adapter,
                 privilege_codes=tuple(str(v) for v in values),
             )
             registry = PlanKindRegistry()

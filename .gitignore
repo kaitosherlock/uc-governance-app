@@ -25,7 +25,6 @@ test-results/
 # pytest tmp_path roots created by the backend suite. Several names are in use because
 # different dispatches configured their own basetemp; all are unreadable by other processes
 # on Windows and none is ever shippable, so `databricks sync` must not see them.
-.pytest-temp/
-.pytest-task-tmp/
-pytest-tmp/
-pytest-tmp-*/
+# Agents keep inventing new basetemp names, so match the shape rather than each name.
+.pytest-*/
+pytest-tmp*/

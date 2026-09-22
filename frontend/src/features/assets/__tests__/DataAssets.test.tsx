@@ -10,6 +10,8 @@ import { DataAssetsView } from "../DataAssetsView";
 import { AssetActionControl } from "../AssetActionControl";
 import { UnknownBadge } from "../UnknownBadge";
 import { AssetSearch } from "../AssetSearch";
+import { ErrorView } from "../StateViews";
+import { ApiError, AbortError } from "@/api/errors";
 
 const server = setupServer(...handlers);
 
@@ -137,6 +139,9 @@ describe("Data Assets UI (P1-06)", () => {
       });
 
       expect(
+        screen.getByText(strings.errorCodes.INSUFFICIENT_PRIVILEGES.title),
+      ).toBeTruthy();
+      expect(
         screen.getByText("The execution identity lacks required Unity Catalog privileges."),
       ).toBeTruthy();
       expect(
@@ -148,6 +153,7 @@ describe("Data Assets UI (P1-06)", () => {
       expect(
         screen.getByRole("button", { name: strings.common.retry }),
       ).toBeTruthy();
+      expect(screen.queryByText(strings.errors.generic)).toBeNull();
     });
 
     it("4. Success state: renders asset overview and meta.limitations under the data", async () => {
@@ -340,19 +346,61 @@ describe("Data Assets UI (P1-06)", () => {
 
     it("aborted search request does not render an error", async () => {
       server.use(
-        http.get("*/api/v1/catalogs", async () => {
-          // Simulate a cancelled response
-          throw new DOMException("The user aborted a request.", "AbortError");
+        http.get("*/api/v1/catalogs", async ({ request }) => {
+          const url = new URL(request.url);
+          const q = url.searchParams.get("query");
+          if (q === "cust") {
+            // Keep first search request in-flight long enough to be superseded
+            await delay(600);
+          }
+          return HttpResponse.json({
+            success: true,
+            data: [
+              {
+                securable_type: "CATALOG",
+                full_name: q ? `catalog_${q}` : "sales",
+                kind: "catalog",
+                display_name: q ? `catalog_${q}` : "sales",
+                owner: "data-eng",
+                comment: "Catalog",
+              },
+            ],
+            meta: {
+              source: "fixture",
+              observed_at: "2026-09-21T09:00:00Z",
+              completeness: "complete",
+              limitations: [],
+              correlation_id: "corr-search",
+            },
+          });
         }),
       );
 
       renderDataAssets("/assets");
 
-      // Wait a bit to ensure no error is thrown into UI
+      const searchInput = screen.getByRole("searchbox");
+
+      // Type initial search query
+      fireEvent.change(searchInput, { target: { value: "cust" } });
+
+      // Advance past debounce (300ms) to trigger first in-flight fetch
       await act(async () => {
-        await new Promise((r) => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, 350));
       });
 
+      // While the first request is in-flight, type second search query to supersede it
+      fireEvent.change(searchInput, { target: { value: "customer" } });
+
+      // Advance past second debounce (300ms) and allow superseding query to complete
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 450));
+      });
+
+      // The superseding result must render and no error alert must ever appear
+      const treeNav = screen.getByLabelText(strings.assets.treeAriaLabel);
+      await waitFor(() => {
+        expect(within(treeNav).getByText("catalog_customer")).toBeTruthy();
+      });
       expect(screen.queryByRole("alert")).toBeNull();
     });
   });
@@ -402,6 +450,246 @@ describe("Data Assets UI (P1-06)", () => {
       await waitFor(() => {
         expect(copiedText).toBe("sales.crm.orders");
       });
+    });
+  });
+
+  /* ---------------------------------------------------------------- Browse Tree Error Handling (P1-ERR-frontend) */
+  describe("Browse Tree Error Handling (P1-ERR-frontend)", () => {
+    it("catalogs tree error renders mapped title, server message, next_steps, correlation ID, and NOT strings.errors.generic", async () => {
+      server.use(
+        http.get("*/api/v1/catalogs", () => {
+          return HttpResponse.json(
+            {
+              success: false,
+              code: "INSUFFICIENT_PRIVILEGES",
+              message: "The executing identity cannot read this resource.",
+              correlation_id: "94012433-7f32-45f3-862f-21f49005659d",
+              next_steps: ["Ask your administrator for UC catalog browse privilege"],
+            },
+            { status: 403 },
+          );
+        }),
+      );
+
+      renderDataAssets("/assets");
+
+      const treeNav = screen.getByLabelText(strings.assets.treeAriaLabel);
+
+      await waitFor(() => {
+        expect(within(treeNav).getByRole("alert")).toBeTruthy();
+      });
+
+      // Mapped title, NOT raw code and NOT generic string
+      expect(
+        within(treeNav).getByText(strings.errorCodes.INSUFFICIENT_PRIVILEGES.title),
+      ).toBeTruthy();
+
+      // Server message
+      expect(
+        within(treeNav).getByText("The executing identity cannot read this resource."),
+      ).toBeTruthy();
+
+      // Next steps
+      expect(
+        within(treeNav).getByText("Ask your administrator for UC catalog browse privilege"),
+      ).toBeTruthy();
+
+      // Correlation ID inside details
+      expect(
+        within(treeNav).getByText("94012433-7f32-45f3-862f-21f49005659d"),
+      ).toBeTruthy();
+
+      // Retry button is present
+      expect(
+        within(treeNav).getByRole("button", { name: strings.common.retry }),
+      ).toBeTruthy();
+
+      // strings.errors.generic is NOT rendered
+      expect(within(treeNav).queryByText(strings.errors.generic)).toBeNull();
+      expect(screen.queryByText(strings.errors.generic)).toBeNull();
+    });
+
+    it("schemas tree error renders mapped title, server message, next_steps, correlation ID, and NOT strings.errors.generic", async () => {
+      server.use(
+        http.get("*/api/v1/catalogs/:catalog/schemas", () => {
+          return HttpResponse.json(
+            {
+              success: false,
+              code: "FORBIDDEN_SCOPE",
+              message: "Catalog sales is outside your assigned governance scope.",
+              correlation_id: "corr-schema-scope-77",
+              next_steps: ["Request access to catalog sales from your data steward."],
+            },
+            { status: 403 },
+          );
+        }),
+      );
+
+      renderDataAssets("/assets/sales");
+
+      const treeNav = screen.getByLabelText(strings.assets.treeAriaLabel);
+
+      await waitFor(() => {
+        expect(within(treeNav).getByRole("alert")).toBeTruthy();
+      });
+
+      expect(
+        within(treeNav).getByText(strings.errorCodes.FORBIDDEN_SCOPE.title),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByText("Catalog sales is outside your assigned governance scope."),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByText("Request access to catalog sales from your data steward."),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByText("corr-schema-scope-77"),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByRole("button", { name: strings.common.retry }),
+      ).toBeTruthy();
+      expect(within(treeNav).queryByText(strings.errors.generic)).toBeNull();
+    });
+
+    it("objects tree error renders mapped title, server message, next_steps, correlation ID, and NOT strings.errors.generic", async () => {
+      server.use(
+        http.get("*/api/v1/schemas/:catalog/:schema/objects", () => {
+          return HttpResponse.json(
+            {
+              success: false,
+              code: "INSUFFICIENT_PRIVILEGES",
+              message: "The executing identity lacks USE_SCHEMA privilege on sales.crm.",
+              correlation_id: "corr-objects-perm-88",
+              next_steps: ["Contact access admin for USE_SCHEMA privilege."],
+            },
+            { status: 403 },
+          );
+        }),
+      );
+
+      renderDataAssets("/assets/sales/crm");
+
+      const treeNav = screen.getByLabelText(strings.assets.treeAriaLabel);
+
+      await waitFor(() => {
+        expect(within(treeNav).getByRole("alert")).toBeTruthy();
+      });
+
+      expect(
+        within(treeNav).getByText(strings.errorCodes.INSUFFICIENT_PRIVILEGES.title),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByText("The executing identity lacks USE_SCHEMA privilege on sales.crm."),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByText("Contact access admin for USE_SCHEMA privilege."),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByText("corr-objects-perm-88"),
+      ).toBeTruthy();
+      expect(
+        within(treeNav).getByRole("button", { name: strings.common.retry }),
+      ).toBeTruthy();
+      expect(within(treeNav).queryByText(strings.errors.generic)).toBeNull();
+    });
+
+    it("a thrown value that is not an ApiError falls back to generic message and unknown title", async () => {
+      server.use(
+        http.get("*/api/v1/catalogs", () => {
+          return HttpResponse.error();
+        }),
+      );
+
+      renderDataAssets("/assets");
+
+      const treeNav = screen.getByLabelText(strings.assets.treeAriaLabel);
+
+      await waitFor(
+        () => {
+          expect(within(treeNav).getByRole("alert")).toBeTruthy();
+        },
+        { timeout: 3000 },
+      );
+
+      // Falls back to generic message
+      expect(
+        within(treeNav).getByText(strings.errors.generic),
+      ).toBeTruthy();
+
+      // Title falls back to Unknown
+      expect(
+        within(treeNav).getByText(strings.common.unknown),
+      ).toBeTruthy();
+
+      // Retry control still available
+      expect(
+        within(treeNav).getByRole("button", { name: strings.common.retry }),
+      ).toBeTruthy();
+    });
+
+    it("ErrorView component renders compact and standard variants with all details", () => {
+      const nonApiError = new Error("Plain network glitch");
+      const { rerender } = render(
+        <ErrorView error={nonApiError} onRetry={() => {}} compact />,
+      );
+
+      expect(screen.getByText(strings.common.unknown)).toBeTruthy();
+      expect(screen.getByText(strings.errors.generic)).toBeTruthy();
+      expect(screen.getByRole("button", { name: strings.common.retry })).toBeTruthy();
+
+      rerender(
+        <ErrorView
+          error={
+            new ApiError(
+              {
+                success: false,
+                code: "INSUFFICIENT_PRIVILEGES",
+                message: "Custom permission message",
+                correlation_id: "corr-direct-check",
+                next_steps: ["Direct step 1", "Direct step 2"],
+              },
+              403,
+            )
+          }
+          compact
+        />,
+      );
+
+      expect(screen.getByText(strings.errorCodes.INSUFFICIENT_PRIVILEGES.title)).toBeTruthy();
+      expect(screen.getByText("Custom permission message")).toBeTruthy();
+      expect(screen.getByText("Direct step 1")).toBeTruthy();
+      expect(screen.getByText("Direct step 2")).toBeTruthy();
+      expect(screen.getByText("corr-direct-check")).toBeTruthy();
+
+      // An aborted request must never render an error or alert
+      rerender(
+        <ErrorView
+          error={new DOMException("The user aborted a request.", "AbortError")}
+          compact
+        />,
+      );
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("ErrorView renders nothing for an AbortError instance, while still rendering normally for an ApiError", () => {
+      const apiErr = new ApiError(
+        {
+          success: false,
+          code: "INSUFFICIENT_PRIVILEGES",
+          message: "Action forbidden",
+          correlation_id: "corr-err-1",
+        },
+        403,
+      );
+      const { rerender } = render(<ErrorView error={apiErr} compact />);
+      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.getByText(strings.errorCodes.INSUFFICIENT_PRIVILEGES.title)).toBeTruthy();
+
+      rerender(<ErrorView error={new AbortError()} compact />);
+      expect(screen.queryByRole("alert")).toBeNull();
+
+      rerender(<ErrorView error={new DOMException("The user aborted a request.", "AbortError")} compact />);
+      expect(screen.queryByRole("alert")).toBeNull();
     });
   });
 });

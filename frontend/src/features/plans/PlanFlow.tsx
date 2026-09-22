@@ -96,6 +96,7 @@ export function PlanFlow({
     code: ErrorCode;
     message: string;
     correlationId?: string | null;
+    nextSteps?: string[] | null | undefined;
   } | null>(null);
   const [typedConfirmationValue, setTypedConfirmationValue] = useState("");
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
@@ -278,6 +279,7 @@ export function PlanFlow({
             code: err.code,
             message: err.message,
             correlationId: err.correlationId,
+            nextSteps: err.response.next_steps ?? null,
           });
         }
       }
@@ -319,23 +321,21 @@ export function PlanFlow({
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
+        const errorDetails = {
+          code: err.code,
+          message: err.message,
+          correlationId: err.correlationId,
+          nextSteps: err.response.next_steps ?? null,
+        };
         if (
           err.code === "PLAN_STALE" ||
           err.code === "PLAN_EXPIRED"
         ) {
           // Preview outdated — keep form values, prompt regenerate
-          setConflictError({
-            code: err.code,
-            message: err.message,
-            correlationId: err.correlationId,
-          });
+          setConflictError(errorDetails);
         } else if (err.code === "PLAN_INVALIDATED") {
           // Newer preview replaced this one — keep form values
-          setConflictError({
-            code: err.code,
-            message: err.message,
-            correlationId: err.correlationId,
-          });
+          setConflictError(errorDetails);
         } else if (err.code === "PLAN_TAMPERED") {
           // HMAC mismatch — generic conflict + correlation id, log it
           console.error("Plan cryptographic signature verification failed (PLAN_TAMPERED)", {
@@ -343,11 +343,7 @@ export function PlanFlow({
             code: err.code,
             message: err.message,
           });
-          setConflictError({
-            code: err.code,
-            message: err.message,
-            correlationId: err.correlationId,
-          });
+          setConflictError(errorDetails);
         } else if (err.code === "DUPLICATE_SUBMISSION") {
           // Fetch and display existing operation per spec
           const duplicateOpId =
@@ -359,18 +355,10 @@ export function PlanFlow({
             });
             setOperation(existingRes.data);
           } catch {
-            setConflictError({
-              code: err.code,
-              message: err.message,
-              correlationId: err.correlationId,
-            });
+            setConflictError(errorDetails);
           }
         } else {
-          setConflictError({
-            code: err.code,
-            message: err.message,
-            correlationId: err.correlationId,
-          });
+          setConflictError(errorDetails);
         }
       }
     } finally {
@@ -639,6 +627,16 @@ export function PlanFlow({
                 <p className="text-[var(--text-xs)] font-[var(--font-mono)] text-[var(--color-text-muted)]">
                   {conflictError.message} ({conflictError.code})
                 </p>
+                {conflictError.nextSteps && conflictError.nextSteps.length > 0 && (
+                  <div className="text-[var(--text-xs)] text-[var(--color-text-secondary)]">
+                    <span className="font-[var(--weight-medium)]">{strings.errors.nextStepsPrefix}:</span>
+                    <ul className="list-disc list-inside mt-0.5 space-y-0.5">
+                      {conflictError.nextSteps.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {conflictError.correlationId && (
                   <p className="text-[var(--text-xs)] font-[var(--font-mono)] text-[var(--color-text-secondary)]">
                     <span className="font-[var(--weight-medium)]">

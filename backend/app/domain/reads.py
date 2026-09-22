@@ -10,12 +10,21 @@ from app.adapters.protocols import (
     ObjectReader,
     PrincipalReader,
     SchemaReader,
+    TagReader,
 )
 from app.api.v1.models import ErrorCode, Identity
 from app.authz.roles import Target, decide
 from app.config.settings import Settings
 from app.domain.enums import ActionName, GrantSourceType, TagKind
-from app.domain.models import AllowedAction, AssetDetail, AssetSummary, Grant, GrantsData, Tag
+from app.domain.models import (
+    AllowedAction,
+    AssetDetail,
+    AssetSummary,
+    Grant,
+    GrantsData,
+    Tag,
+    TagPolicy,
+)
 from app.domain.names import access_route, target_parts
 from app.errors import AppError, ForbiddenScope
 
@@ -33,7 +42,26 @@ class Readers:
     grants: GrantReader
     principals: PrincipalReader
     dependencies: DependencyReader
+    tags: TagReader
     privilege_codes: tuple[str, ...]
+
+
+class ReadPolicy:
+    """One source of truth for tag action hints, including system-tag refusal."""
+
+    @staticmethod
+    def tag(tag: Tag, actions: tuple[AllowedAction, ...]) -> Tag:
+        if tag.kind == TagKind.SYSTEM:
+            actions = tuple(
+                AllowedAction(
+                    action=a,
+                    allowed=False,
+                    reason_code="SYSTEM_TAG",
+                    reason="System-controlled tags cannot be edited.",
+                )
+                for a in (ActionName.ASSIGN_TAG, ActionName.REMOVE_TAG)
+            )
+        return replace(tag, allowed_actions=actions)
 
 
 class ReadService:
@@ -102,6 +130,8 @@ class ReadService:
             ActionName.REVOKE,
             ActionName.TRANSFER_OWNERSHIP,
             ActionName.EDIT_METADATA,
+            ActionName.ASSIGN_TAG,
+            ActionName.REMOVE_TAG,
         }:
             return AllowedAction(action=action, allowed=True)
         return AllowedAction(
@@ -138,17 +168,20 @@ class ReadService:
         actions = tuple(
             self.action(a, catalog) for a in (ActionName.ASSIGN_TAG, ActionName.REMOVE_TAG)
         )
-        if tag.kind == TagKind.SYSTEM:
-            actions = tuple(
+        return ReadPolicy.tag(tag, actions)
+
+    def tag_policy(self, policy: TagPolicy) -> TagPolicy:
+        return replace(
+            policy,
+            allowed_actions=(
                 AllowedAction(
-                    action=a,
+                    action=ActionName.ASSIGN_TAG,
                     allowed=False,
-                    reason_code="SYSTEM_TAG",
-                    reason="System-controlled tags cannot be edited.",
-                )
-                for a in (ActionName.ASSIGN_TAG, ActionName.REMOVE_TAG)
-            )
-        return replace(tag, allowed_actions=actions)
+                    reason_code="UNKNOWN",
+                    reason="Governed tag assignment authority could not be determined.",
+                ),
+            ),
+        )
 
     def detail(self, stype: str, name: str) -> AssetDetail:
         catalog = self.catalog_for(stype, name)
@@ -162,6 +195,30 @@ class ReadService:
                 replace(c, tags=tuple(self.tag(t, catalog) for t in c.tags)) for c in asset.columns
             ),
         )
+
+    def tags(
+        self, stype: str, name: str
+    ) -> tuple[AssetDetail, tuple[Tag, ...], dict[str, tuple[Tag, ...]]]:
+        catalog = self.catalog_for(stype, name)
+        self.authorize("tags.read", catalog)
+        asset = self.readers.assets.get_asset(stype, name)
+        tags, column_tags = self.readers.tags.tags(stype, name)
+        return (
+            asset,
+            tuple(self.tag(tag, catalog) for tag in tags),
+            {
+                column: tuple(self.tag(tag, catalog) for tag in values)
+                for column, values in column_tags.items()
+                if values
+            },
+        )
+
+    def tag_policies(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[TagPolicy], str | None]:
+        self.authorize("tag_policies.read")
+        values, token = self.readers.tags.list_tag_policies(page_size, page_token)
+        return [self.tag_policy(value) for value in values], token
 
     def explain(self, grant: Grant, catalog: str | None) -> Grant:
         if grant.source.type == GrantSourceType.INHERITED:

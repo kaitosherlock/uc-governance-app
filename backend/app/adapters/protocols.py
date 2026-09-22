@@ -2,7 +2,15 @@
 
 from typing import Protocol
 
-from app.domain.models import AssetDetail, AssetSummary, DependenciesData, Grant, Principal
+from app.domain.models import (
+    AssetDetail,
+    AssetSummary,
+    DependenciesData,
+    Grant,
+    Principal,
+    Tag,
+    TagPolicy,
+)
 
 # Distinguishes a missing metadata field from an explicit null comment.
 METADATA_COMMENT_UNSET = object()
@@ -58,3 +66,13 @@ class PrincipalReader(Protocol):
 
 class DependencyReader(Protocol):
     def dependencies(self, securable_type: str, full_name: str) -> DependenciesData: ...
+
+
+class TagReader(Protocol):
+    def tags(
+        self, securable_type: str, full_name: str
+    ) -> tuple[tuple[Tag, ...], dict[str, tuple[Tag, ...]]]: ...
+
+    def list_tag_policies(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[TagPolicy], str | None]: ...

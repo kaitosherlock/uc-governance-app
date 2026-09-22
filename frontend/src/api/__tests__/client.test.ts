@@ -116,7 +116,7 @@ describe("apiClient", () => {
     expect(result.data.id).toBe("op-unknown-1");
   });
 
-  it("raises AbortError when a request is cancelled via AbortSignal", async () => {
+  it("converts an aborted AbortSignal into an AbortError", async () => {
     const controller = new AbortController();
     const promise = apiGet("/test-slow", { signal: controller.signal });
     controller.abort();

@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import wraps
 from threading import Lock
@@ -19,7 +20,63 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def translate_exception(exc: Exception) -> AppError:
+@dataclass(frozen=True)
+class OperationContext:
+    """Safe facts known at an SDK call site; never derived from an SDK response."""
+
+    executor: str
+    operation: str
+    securable: str
+    oauth_scope: str | None = None
+    uc_privilege: str | None = None
+
+
+def permission_error(context: OperationContext | None) -> tuple[str, list[str]]:
+    if context is None:
+        return (
+            "The executing identity was denied access while reading this resource.",
+            [
+                "Confirm whether the authenticated user's authorization or the application's "
+                "service principal is used for this operation, then verify its access."
+            ],
+        )
+    executor = "the signed-in user"
+    if context.executor != "user":
+        executor = "the application's service principal"
+    message = f"{executor} was denied permission to {context.operation} on {context.securable}."
+    if context.executor == "user":
+        scope = (
+            f" the `{context.oauth_scope}` OAuth scope"
+            if context.oauth_scope is not None
+            else " an OAuth scope required for this resource type"
+        )
+        return (
+            message,
+            [
+                "The application uses the signed-in user's authorization for this operation. "
+                f"Its user authorization may not include{scope}; ask an app administrator to "
+                "review the application's user OAuth scopes."
+            ],
+        )
+    if context.uc_privilege is not None:
+        return (
+            message,
+            [
+                f"Ask a metastore or catalog admin to grant the application's service principal "
+                f"{context.uc_privilege} on {context.securable}, if that privilege is appropriate "
+                "for this operation."
+            ],
+        )
+    return (
+        message,
+        [
+            "The application uses its service principal for this operation. Ask a metastore or "
+            "catalog admin to verify the service principal's required access to this resource."
+        ],
+    )
+
+
+def translate_exception(exc: Exception, context: OperationContext | None = None) -> AppError:
     possible_status = getattr(exc, "status_code", None) or getattr(exc, "http_status_code", None)
     status = possible_status if isinstance(possible_status, int) else None
     possible_code = getattr(exc, "error_code", None)
@@ -55,12 +112,15 @@ def translate_exception(exc: Exception) -> AppError:
     translated = mapping.get(status) if status is not None else None
     error_code, http_status = translated or (ErrorCode.UPSTREAM_UNAVAILABLE, 503)
     message = {
-        ErrorCode.INSUFFICIENT_PRIVILEGES: ("The executing identity cannot read this resource."),
         ErrorCode.NOT_FOUND: "Not found or not visible to the executing identity.",
         ErrorCode.RATE_LIMITED: "Databricks is rate-limiting requests. Try again later.",
         ErrorCode.UPSTREAM_UNAVAILABLE: "Databricks is temporarily unavailable.",
-    }[error_code]
-    error = AppError(error_code, message, http_status)
+    }
+    if error_code == ErrorCode.INSUFFICIENT_PRIVILEGES:
+        error_message, next_steps = permission_error(context)
+    else:
+        error_message, next_steps = message[error_code], []
+    error = AppError(error_code, error_message, http_status, next_steps)
     request_id = getattr(exc, "request_id", None)
     if request_id is None:
         kwargs = getattr(exc, "kwargs", None)

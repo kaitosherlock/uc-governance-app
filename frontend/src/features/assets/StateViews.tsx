@@ -1,6 +1,6 @@
 import { AlertCircle, AlertTriangle, Database, Info, RefreshCw } from "lucide-react";
 import type { Meta } from "@contracts/types";
-import { describeError } from "@/api/errors";
+import { describeError, isAbortError } from "@/api/errors";
 import { strings } from "@/lib/strings";
 
 interface IdleViewProps {
@@ -30,15 +30,89 @@ export function IdleView({
 interface ErrorViewProps {
   error: unknown;
   onRetry?: (() => void) | undefined;
+  compact?: boolean | undefined;
+  className?: string | undefined;
 }
 
-export function ErrorView({ error, onRetry }: ErrorViewProps) {
+export function ErrorView({
+  error,
+  onRetry,
+  compact = false,
+  className = "",
+}: ErrorViewProps) {
+  // An aborted request is not an error and must never render as one
+  if (isAbortError(error)) {
+    return null;
+  }
+
   const desc = describeError(error);
+
+  if (compact) {
+    return (
+      <div
+        role="alert"
+        className={`p-3 border border-[var(--color-danger)]/30 bg-[var(--color-danger-bg)] rounded-[var(--radius-control)] text-[var(--color-text-primary)] my-1.5 ${className}`}
+      >
+        <div className="flex items-start gap-2">
+          <AlertCircle
+            className="w-4 h-4 text-[var(--color-danger)] shrink-0 mt-0.5"
+            aria-hidden="true"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="text-[var(--text-xs)] font-[var(--weight-semibold)] text-[var(--color-danger)]">
+              {desc.title}
+            </div>
+            <p className="mt-0.5 text-[11px] text-[var(--color-text-secondary)] leading-tight">
+              {desc.body}
+            </p>
+
+            {desc.nextSteps.length > 0 ? (
+              <div className="mt-2">
+                <span className="text-[10px] font-[var(--weight-semibold)] text-[var(--color-text-primary)] uppercase tracking-wide">
+                  {strings.errors.nextStepsPrefix}
+                </span>
+                <ul className="mt-0.5 list-disc list-inside text-[11px] text-[var(--color-text-secondary)] space-y-0.5">
+                  {desc.nextSteps.map((step, idx) => (
+                    <li key={idx}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {desc.correlationId ? (
+              <details className="mt-2 text-[11px] text-[var(--color-text-muted)]">
+                <summary className="cursor-pointer font-[var(--weight-medium)] hover:underline focus:outline-none">
+                  {strings.context.errorDetails}
+                </summary>
+                <div className="mt-1 font-[var(--font-mono)] text-[10px] bg-[var(--color-neutral-0)]/60 p-1.5 rounded border border-[var(--color-danger)]/20 inline-block max-w-full overflow-x-auto">
+                  <span>{strings.errors.correlationPrefix} </span>
+                  <span className="select-all break-all">{desc.correlationId}</span>
+                </div>
+              </details>
+            ) : null}
+
+            {onRetry ? (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-control)] text-[var(--text-xs)] font-[var(--weight-medium)] bg-[var(--color-neutral-0)] text-[var(--color-text-primary)] border border-[var(--color-border-strong)] hover:bg-[var(--color-neutral-1)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] focus:ring-offset-1"
+                >
+                  <RefreshCw className="w-3 h-3" aria-hidden="true" />
+                  <span>{strings.common.retry}</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       role="alert"
-      className="p-[var(--space-5)] border border-[var(--color-danger)]/30 bg-[var(--color-danger-bg)] rounded-[var(--radius-panel)] text-[var(--color-text-primary)] my-[var(--space-4)]"
+      className={`p-[var(--space-5)] border border-[var(--color-danger)]/30 bg-[var(--color-danger-bg)] rounded-[var(--radius-panel)] text-[var(--color-text-primary)] my-[var(--space-4)] ${className}`}
     >
       <div className="flex items-start gap-[var(--space-3)]">
         <AlertCircle
@@ -94,6 +168,10 @@ export function ErrorView({ error, onRetry }: ErrorViewProps) {
       </div>
     </div>
   );
+}
+
+export function CompactErrorView(props: Omit<ErrorViewProps, "compact">) {
+  return <ErrorView {...props} compact />;
 }
 
 interface LimitationsViewProps {

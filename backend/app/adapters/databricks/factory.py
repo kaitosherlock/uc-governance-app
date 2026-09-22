@@ -5,7 +5,7 @@ from hashlib import sha256
 from typing import TYPE_CHECKING, Any, cast
 
 from app.adapters.databricks.catalogs import CatalogsAdapter
-from app.adapters.databricks.common import CursorStore
+from app.adapters.databricks.common import CursorStore, OperationContext, translate_exception
 from app.adapters.databricks.dependencies import DependenciesAdapter
 from app.adapters.databricks.functions import FunctionsAdapter
 from app.adapters.databricks.grants import GrantsAdapter
@@ -13,6 +13,7 @@ from app.adapters.databricks.models import ModelsAdapter
 from app.adapters.databricks.principals import PrincipalsAdapter
 from app.adapters.databricks.schemas import SchemasAdapter
 from app.adapters.databricks.tables import TablesAdapter
+from app.adapters.databricks.tags import TagsAdapter
 from app.adapters.databricks.volumes import VolumesAdapter
 from app.adapters.protocols import AssetReader, ObjectReader
 from app.api.v1.models import Actor, ActorKind, AppRole
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from databricks.sdk import WorkspaceClient
     from databricks.sdk.service.catalog import (
         CatalogsAPI,
+        EntityTagAssignmentsAPI,
         FunctionsAPI,
         GrantsAPI,
         RegisteredModelsAPI,
@@ -34,14 +36,57 @@ if TYPE_CHECKING:
         VolumesAPI,
     )
     from databricks.sdk.service.iam import GroupsAPI, ServicePrincipalsAPI, UsersAPI
+    from databricks.sdk.service.tags import TagPoliciesAPI
 
 
 class LazyService:
-    def __init__(self, factory: Callable[[], "WorkspaceClient"], service: str) -> None:
-        self.factory, self.service = factory, service
+    def __init__(
+        self, factory: Callable[[], "WorkspaceClient"], service: str, executor: str
+    ) -> None:
+        self.factory, self.service, self.executor = factory, service, executor
 
     def __getattr__(self, name: str) -> Any:
-        return getattr(getattr(self.factory(), self.service), name)
+        method = getattr(getattr(self.factory(), self.service), name)
+
+        def invoke(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return method(*args, **kwargs)
+            except Exception as exc:
+                raise translate_exception(exc, self._context(name, kwargs)) from None
+
+        return invoke
+
+    def _context(self, method: str, kwargs: dict[str, Any]) -> OperationContext:
+        operation = f"{method.replace('_', ' ')} {self.service.replace('_', ' ')}"
+        name = kwargs.get("full_name") or kwargs.get("name")
+        catalog = kwargs.get("catalog_name")
+        schema = kwargs.get("schema_name")
+        if isinstance(name, str):
+            securable = name
+        elif isinstance(catalog, str) and isinstance(schema, str):
+            securable = f"{catalog}.{schema}"
+        elif isinstance(catalog, str):
+            securable = catalog
+        else:
+            securable = self.service.replace("_", " ")
+        scopes = {
+            "catalogs": "catalog.catalogs",
+            "schemas": "catalog.schemas",
+            "tables": "catalog.tables",
+        }
+        privileges = {
+            "catalogs": "BROWSE",
+            "schemas": "USE_CATALOG",
+            "tables": "USE_CATALOG and USE_SCHEMA",
+            "grants": "MANAGE",
+        }
+        return OperationContext(
+            executor=self.executor,
+            operation=operation,
+            securable=securable,
+            oauth_scope=scopes.get(self.service),
+            uc_privilege=privileges.get(self.service),
+        )
 
 
 class AssetRouter:
@@ -85,8 +130,6 @@ class SDKIdentityResolver:
 
     async def resolve(self, access_token: str) -> ResolvedUser:
         # Resolve identity only using the verified user-token client.
-        from app.adapters.databricks.common import translate_exception
-
         try:
             from databricks.sdk import WorkspaceClient
 
@@ -127,7 +170,7 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         return clients[executor]
 
     def service(name: str, executor: str = "user") -> LazyService:
-        return LazyService(lambda: client(executor), name)
+        return LazyService(lambda: client(executor), name, executor)
 
     key = sha256((settings.workspace_host + "\0" + access_token).encode()).hexdigest()
     catalogs = CatalogsAdapter(cast("CatalogsAPI", service("catalogs")), cursors, key)
@@ -139,6 +182,12 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         cast("RegisteredModelsAPI", service("registered_models", "sp")), cursors, key
     )
     grants = GrantsAdapter(cast("GrantsAPI", service("grants", "sp")))
+    tags = TagsAdapter(
+        cast("EntityTagAssignmentsAPI", service("entity_tag_assignments")),
+        cast("TagPoliciesAPI", service("tag_policies")),
+        cursors,
+        key,
+    )
     principals = PrincipalsAdapter(
         cast("UsersAPI", service("users", "sp")),
         cast("GroupsAPI", service("groups", "sp")),
@@ -165,5 +214,6 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         grants=grants,
         principals=principals,
         dependencies=DependenciesAdapter(),
+        tags=tags,
         privilege_codes=tuple(p.value for p in Privilege),
     )

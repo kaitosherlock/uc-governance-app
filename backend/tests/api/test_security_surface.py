@@ -26,6 +26,8 @@ READ_CALLS: dict[str, tuple[str, str]] = {
     "getAsset": ("GET", "/api/v1/assets/TABLE/sales.crm.orders"),
     "getAssetDependencies": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/dependencies"),
     "getGrants": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/grants"),
+    "getTags": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/tags"),
+    "listTagPolicies": ("GET", "/api/v1/tag-policies"),
     "listPrivileges": ("GET", "/api/v1/privileges?securable_type=TABLE"),
     "searchPrincipals": ("GET", "/api/v1/principals/search?q=an"),
 }
@@ -133,6 +135,17 @@ def test_plan_scope_denial_is_not_misreported_as_a_role_denial(
     app = fixture_app(monkeypatch, "pat.platform")
     with TestClient(app) as client:
         response = client.post("/api/v1/plans", json=plan_body(target="hr.people.records"))
+    assert response.status_code == 403
+    assert response.json()["code"] == "FORBIDDEN_SCOPE"
+
+
+def test_tag_read_scope_denial_is_not_misreported_as_a_role_denial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("UCGOV_MANAGED_CATALOGS", "sales")
+    app = fixture_app(monkeypatch, "pat.platform")
+    with TestClient(app) as client:
+        response = client.get("/api/v1/assets/TABLE/hr.people.records/tags")
     assert response.status_code == 403
     assert response.json()["code"] == "FORBIDDEN_SCOPE"
 

@@ -131,6 +131,7 @@ describe("ContextBar", () => {
       screen.getByText("Your application role does not have permission."),
     ).toBeTruthy();
     expect(screen.getByText(/corr-test-error-456/)).toBeTruthy();
+    expect(screen.getByText(/Contact admin/)).toBeTruthy();
   });
 
   it("renders limitations when present", () => {

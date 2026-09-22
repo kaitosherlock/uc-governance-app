@@ -79,7 +79,7 @@ export function describeError(error: unknown): ErrorDescription {
     };
   }
 
-  if (error instanceof AbortError) {
+  if (isAbortError(error)) {
     return {
       title: strings.common.cancel,
       body: strings.errors.networkError,
@@ -94,6 +94,18 @@ export function describeError(error: unknown): ErrorDescription {
     nextSteps: [],
     correlationId: null,
   };
+}
+
+/** True when the error represents a cancelled/aborted request. */
+export function isAbortError(error: unknown): boolean {
+  if (error instanceof AbortError) return true;
+  if (typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+  if (typeof error === "object" && error !== null && (error as { name?: string }).name === "AbortError") {
+    return true;
+  }
+  return false;
 }
 
 /** True when the error is a 4xx ApiError — callers should not retry. */

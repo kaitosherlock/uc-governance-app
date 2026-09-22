@@ -16,7 +16,8 @@ import { AssetSearch } from "./AssetSearch";
 import { AssetTree } from "./AssetTree";
 import { CatalogSchemasTable } from "./CatalogSchemasTable";
 import { SchemaObjectsTable } from "./SchemaObjectsTable";
-import { ErrorView, IdleView, LocalizedSkeleton } from "./StateViews";
+import { EmptySuccessView, ErrorView, IdleView, LocalizedSkeleton } from "./StateViews";
+import { isAbortError } from "@/api/errors";
 
 export function DataAssetsView() {
   const { catalog, schema, objectType, name } = useParams<{
@@ -357,43 +358,69 @@ export function DataAssetsView() {
               </div>
             ) : null
           ) : /* 4. Root / Idle Route */
-          searchQuery && catalogsQuery.data?.data ? (
-            <div className="p-[var(--space-6)] space-y-4">
-              <h2 className="text-[var(--text-base)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
-                {strings.assets.searchResultsFor} &quot;{searchQuery}&quot;
-              </h2>
-              <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] bg-[var(--color-neutral-0)]">
-                <table className="w-full text-left border-collapse text-[var(--text-sm)]">
-                  <thead>
-                    <tr className="border-b border-[var(--color-border-subtle)] bg-[var(--color-neutral-1)] text-[var(--color-text-secondary)] font-[var(--weight-semibold)]">
-                      <th scope="col" className="px-4 py-2.5">{strings.assets.catalogsTitle}</th>
-                      <th scope="col" className="px-4 py-2.5">{strings.assets.fields.owner}</th>
-                      <th scope="col" className="px-4 py-2.5">{strings.assets.fields.comment}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--color-border-subtle)]">
-                    {catalogsQuery.data.data.map((cat) => (
-                      <tr key={cat.full_name} className="hover:bg-[var(--color-neutral-1)]/60">
-                        <td className="px-4 py-2.5 font-[var(--font-mono)]">
-                          <Link
-                            to={`/assets/${encodeURIComponent(cat.display_name)}`}
-                            className="text-[var(--color-accent)] hover:underline focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring-color)] rounded"
-                          >
-                            {cat.display_name}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-2.5 text-[var(--text-xs)] text-[var(--color-text-secondary)] font-[var(--font-mono)]">
-                          {cat.owner || strings.assets.fields.unassignedOwner}
-                        </td>
-                        <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">
-                          {cat.comment || strings.assets.fields.noComment}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          searchQuery ? (
+            catalogsQuery.isLoading ? (
+              <div className="p-[var(--space-6)] space-y-4">
+                <LocalizedSkeleton className="h-8 w-48" />
+                <LocalizedSkeleton className="h-64 w-full" />
               </div>
-            </div>
+            ) : catalogsQuery.isError && !isAbortError(catalogsQuery.error) ? (
+              <div className="p-[var(--space-6)]">
+                <ErrorView
+                  error={catalogsQuery.error}
+                  onRetry={() => catalogsQuery.refetch()}
+                />
+              </div>
+            ) : catalogsQuery.data?.data && catalogsQuery.data.data.length > 0 ? (
+              <div className="p-[var(--space-6)] space-y-4">
+                <h2 className="text-[var(--text-base)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+                  {strings.assets.searchResultsFor} &quot;{searchQuery}&quot;
+                </h2>
+                <div className="overflow-x-auto border border-[var(--color-border-subtle)] rounded-[var(--radius-panel)] bg-[var(--color-neutral-0)]">
+                  <table className="w-full text-left border-collapse text-[var(--text-sm)]">
+                    <thead>
+                      <tr className="border-b border-[var(--color-border-subtle)] bg-[var(--color-neutral-1)] text-[var(--color-text-secondary)] font-[var(--weight-semibold)]">
+                        <th scope="col" className="px-4 py-2.5">{strings.assets.catalogsTitle}</th>
+                        <th scope="col" className="px-4 py-2.5">{strings.assets.fields.owner}</th>
+                        <th scope="col" className="px-4 py-2.5">{strings.assets.fields.comment}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--color-border-subtle)]">
+                      {catalogsQuery.data.data.map((cat) => (
+                        <tr key={cat.full_name} className="hover:bg-[var(--color-neutral-1)]/60">
+                          <td className="px-4 py-2.5 font-[var(--font-mono)]">
+                            <Link
+                              to={`/assets/${encodeURIComponent(cat.display_name)}`}
+                              className="text-[var(--color-accent)] hover:underline focus:outline-none focus:ring-1 focus:ring-[var(--focus-ring-color)] rounded"
+                            >
+                              {cat.display_name}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-2.5 text-[var(--text-xs)] text-[var(--color-text-secondary)] font-[var(--font-mono)]">
+                            {cat.owner || strings.assets.fields.unassignedOwner}
+                          </td>
+                          <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">
+                            {cat.comment || strings.assets.fields.noComment}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : catalogsQuery.isFetching ? (
+              <div className="p-[var(--space-6)] space-y-4">
+                <LocalizedSkeleton className="h-8 w-48" />
+                <LocalizedSkeleton className="h-64 w-full" />
+              </div>
+            ) : (
+              <div className="p-[var(--space-6)]">
+                <EmptySuccessView
+                  message={strings.common.noResults}
+                  meta={catalogsQuery.data?.meta}
+                />
+              </div>
+            )
           ) : (
             <div className="p-[var(--space-6)]">
               <IdleView />

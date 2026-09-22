@@ -16,18 +16,20 @@ from app.adapters.protocols import (
     GrantReader,
     GrantWriter,
     PrincipalReader,
+    TagReader,
 )
 from app.api import mappers
 from app.api.v1 import models as w
-from app.domain.enums import GrantSourceType
-from app.domain.models import AssetDetail, Grant
+from app.domain.enums import ActionName, GrantSourceType, TagKind
+from app.domain.models import AllowedAction, AssetDetail, Grant, Tag, TagPolicy
 from app.domain.names import access_route, parts
 from app.domain.privileges import APPLICABILITY
+from app.domain.reads import ReadPolicy
 from app.errors import NotImplementedYet, ValidationFailed
 from app.mutations.core import MutationWriteResult, PlanKindHandler, Preview
 
 
-class MutationAdapter(AssetReader, GrantReader, GrantWriter, PrincipalReader, Protocol):
+class MutationAdapter(AssetReader, GrantReader, GrantWriter, PrincipalReader, TagReader, Protocol):
     """Reads and writes needed by the four registered plan kinds."""
 
     def transfer_ownership(self, securable_type: str, full_name: str, new_owner: str) -> None: ...
@@ -39,6 +41,15 @@ class MutationAdapter(AssetReader, GrantReader, GrantWriter, PrincipalReader, Pr
         comment: str | None | object,
         properties: dict[str, str] | None,
         column_comments: dict[str, str | None] | None,
+    ) -> None: ...
+
+    def update_tags(
+        self,
+        securable_type: str,
+        full_name: str,
+        column: str | None,
+        assign: tuple[Tag, ...],
+        remove: tuple[str, ...],
     ) -> None: ...
 
 
@@ -70,6 +81,19 @@ def _statement(method: str, target: w.AssetRef, **arguments: object) -> str:
 class _GrantChanges:
     principal: str
     privileges: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _TagChange:
+    key: str
+    value: str | None
+    has_value: bool
+
+
+@dataclass(frozen=True)
+class _TagChanges:
+    column: str | None
+    tags: tuple[_TagChange, ...]
 
 
 class RegisteredPlanKind(PlanKindHandler):
@@ -217,6 +241,112 @@ class FixturePlanKindHandler(PlanKindHandler):
         self._principal(owner, "changes.new_owner")
         return owner
 
+    def _tag_changes(self, changes: dict[str, object], asset: AssetDetail) -> _TagChanges:
+        if not changes or not set(changes).issubset({"column", "tags"}) or "tags" not in changes:
+            raise _field_error(
+                "changes", "INVALID", "Tag changes require tags and optional column."
+            )
+        column = changes.get("column")
+        if column is not None and (not isinstance(column, str) or not column.strip()):
+            raise _field_error(
+                "changes.column", "INVALID", "column must be null or a non-empty string."
+            )
+        if column is not None and not any(item.name == column for item in asset.columns):
+            raise _field_error(
+                "changes.column",
+                "NOT_FOUND",
+                f"Column '{column}' does not exist on '{asset.full_name}'.",
+            )
+        raw_tags = changes.get("tags")
+        if not isinstance(raw_tags, list) or not raw_tags:
+            raise _field_error("changes.tags", "INVALID", "tags must contain at least one tag.")
+        parsed: list[_TagChange] = []
+        for index, raw in enumerate(raw_tags):
+            field = f"changes.tags[{index}]"
+            if not isinstance(raw, dict) or set(raw) - {"key", "value"} or "key" not in raw:
+                raise _field_error(
+                    field, "INVALID", "Each tag must contain key and optional value."
+                )
+            key = _string(raw.get("key"), f"{field}.key")
+            value = raw.get("value")
+            if value is not None and not isinstance(value, str):
+                raise _field_error(f"{field}.value", "INVALID", "value must be a string or null.")
+            parsed.append(_TagChange(key=key, value=value, has_value="value" in raw))
+        if len({item.key for item in parsed}) != len(parsed):
+            raise _field_error(
+                "changes.tags", "DUPLICATE", "Each tag key may appear only once per plan."
+            )
+        return _TagChanges(column=column, tags=tuple(parsed))
+
+    @staticmethod
+    def _tags_at(asset: AssetDetail, column: str | None) -> tuple[Tag, ...]:
+        if column is None:
+            return asset.tags
+        value = next(item for item in asset.columns if item.name == column)
+        return value.tags
+
+    def _policies(self) -> dict[str, TagPolicy]:
+        values, token = self.adapter.list_tag_policies(200, None)
+        if token:
+            raise _field_error(
+                "changes.tags", "UNKNOWN", "The tag-policy listing is incomplete; retry later."
+            )
+        return {value.key: value for value in values}
+
+    @staticmethod
+    def _tag_kind(current: Tag | None, policy: TagPolicy | None) -> TagKind:
+        if current is not None:
+            return current.kind
+        return TagKind.GOVERNED if policy is not None else TagKind.FREE_FORM
+
+    def _validate_tag_change(
+        self,
+        change: _TagChange,
+        current: Tag | None,
+        policy: TagPolicy | None,
+    ) -> TagKind:
+        kind = self._tag_kind(current, policy)
+        candidate = current or Tag(
+            key=change.key, value=change.value, kind=kind, allowed_actions=()
+        )
+        actions = tuple(
+            AllowedAction(action=action, allowed=True)
+            for action in (ActionName.ASSIGN_TAG, ActionName.REMOVE_TAG)
+        )
+        evaluated = ReadPolicy.tag(candidate, actions)
+        action_name = (
+            ActionName.ASSIGN_TAG if self.kind == w.PlanKind.ASSIGN_TAGS else ActionName.REMOVE_TAG
+        )
+        action = next(item for item in evaluated.allowed_actions if item.action == action_name)
+        if not action.allowed:
+            raise _field_error(
+                "changes.tags", action.reason_code or "INVALID", action.reason or "Tag rejected."
+            )
+        if (
+            self.kind == w.PlanKind.ASSIGN_TAGS
+            and kind == TagKind.GOVERNED
+            and policy
+            and policy.allowed_values is not None
+            and change.value not in policy.allowed_values
+        ):
+            permitted = ", ".join(repr(value) for value in policy.allowed_values)
+            raise _field_error(
+                "changes.tags",
+                "INVALID_VALUE",
+                (
+                    f"Tag '{change.key}' value {change.value!r} is not permitted; "
+                    f"allowed values: [{permitted}]."
+                ),
+            )
+        return kind
+
+    @staticmethod
+    def _tag_impact(key: str, verb: str) -> str:
+        return (
+            f"Row filters, column masks or ABAC policies keyed on tag '{key}' may begin or cease "
+            f"to apply after this {verb}; the app has not evaluated them."
+        )
+
     @staticmethod
     def _metadata_matches(
         asset: AssetDetail,
@@ -251,6 +381,12 @@ class FixturePlanKindHandler(PlanKindHandler):
                 "comment": asset.comment,
                 "properties": asset.properties,
                 "columns": {column.name: column.comment for column in asset.columns},
+                "tags": [(tag.key, tag.value, tag.kind.value) for tag in asset.tags],
+                "column_tags": {
+                    column.name: [(tag.key, tag.value, tag.kind.value) for tag in column.tags]
+                    for column in asset.columns
+                    if column.tags
+                },
             },
             "direct": self._grants_state(direct),
             "effective": self._grants_state(effective),
@@ -463,6 +599,81 @@ class FixturePlanKindHandler(PlanKindHandler):
                 unknown.append(
                     "Effects of metadata changes on external documentation consumers are not known."
                 )
+            elif self.kind in (w.PlanKind.ASSIGN_TAGS, w.PlanKind.REMOVE_TAGS):
+                tag_changes = self._tag_changes(request.changes, asset)
+                current = {tag.key: tag for tag in self._tags_at(asset, tag_changes.column)}
+                policies = self._policies()
+                verb = "assign" if self.kind == w.PlanKind.ASSIGN_TAGS else "remove"
+                location = (
+                    f"column `{tag_changes.column}` on `{target.full_name}`"
+                    if tag_changes.column is not None
+                    else f"`{target.full_name}`"
+                )
+                for change in tag_changes.tags:
+                    old = current.get(change.key)
+                    kind = self._validate_tag_change(change, old, policies.get(change.key))
+                    if self.kind == w.PlanKind.ASSIGN_TAGS:
+                        no_op = old is not None and old.value == change.value
+                        description = (
+                            (
+                                f"No change: tag `{change.key}` already has value "
+                                f"{change.value!r} on {location}."
+                            )
+                            if no_op
+                            else (
+                                (
+                                    f"Replace tag `{change.key}` value {old.value!r} with "
+                                    f"{change.value!r} on {location}."
+                                )
+                                if old is not None
+                                else (
+                                    f"Assign tag `{change.key}` value {change.value!r} "
+                                    f"on {location}."
+                                )
+                            )
+                        )
+                        statement = (
+                            "No request will be sent for this tag no-op."
+                            if no_op
+                            else _statement(
+                                "entity_tag_assignments.update"
+                                if old is not None
+                                else "entity_tag_assignments.create",
+                                target,
+                                column=tag_changes.column,
+                                tag_key=change.key,
+                                tag_value=change.value,
+                                kind=kind.value,
+                            )
+                        )
+                    else:
+                        no_op = old is None
+                        description = (
+                            f"No change: tag `{change.key}` is not present on {location}."
+                            if no_op
+                            else f"Remove tag `{change.key}` from {location}."
+                        )
+                        statement = (
+                            "No request will be sent for this tag no-op."
+                            if no_op
+                            else _statement(
+                                "entity_tag_assignments.delete",
+                                target,
+                                column=tag_changes.column,
+                                tag_key=change.key,
+                            )
+                        )
+                    normalized.append(
+                        w.NormalizedChange(
+                            target=target, description=description, statement_preview=statement
+                        )
+                    )
+                    unknown.append(self._tag_impact(change.key, verb))
+                    if kind == TagKind.GOVERNED and self.kind == w.PlanKind.ASSIGN_TAGS:
+                        prerequisites.append(
+                            "Governed tag assignment authority could not be determined; fixture "
+                            "execution simulates the requested change only."
+                        )
             else:
                 raise NotImplementedYet()
         return Preview(
@@ -524,6 +735,35 @@ class FixturePlanKindHandler(PlanKindHandler):
                 target.securable_type.value, target.full_name, comment, properties, column_comments
             )
             return MutationWriteResult(status="applied", summary="Metadata update was sent.")
+        if self.kind in (w.PlanKind.ASSIGN_TAGS, w.PlanKind.REMOVE_TAGS):
+            asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
+            tag_delta = self._tag_changes(changes, asset)
+            current = {tag.key: tag for tag in self._tags_at(asset, tag_delta.column)}
+            policies = self._policies()
+            selected_assign: list[Tag] = []
+            selected_remove: list[str] = []
+            for change in tag_delta.tags:
+                old = current.get(change.key)
+                kind = self._validate_tag_change(change, old, policies.get(change.key))
+                if self.kind == w.PlanKind.ASSIGN_TAGS:
+                    if old is None or old.value != change.value:
+                        selected_assign.append(
+                            Tag(key=change.key, value=change.value, kind=kind, allowed_actions=())
+                        )
+                elif old is not None:
+                    selected_remove.append(change.key)
+            if not selected_assign and not selected_remove:
+                return MutationWriteResult(
+                    status="applied", summary="No write was necessary; tags already match."
+                )
+            self.adapter.update_tags(
+                target.securable_type.value,
+                target.full_name,
+                tag_delta.column,
+                tuple(selected_assign),
+                tuple(selected_remove),
+            )
+            return MutationWriteResult(status="applied", summary="Tag changes were sent.")
         raise NotImplementedYet()
 
     def verify(self, target: w.AssetRef, changes: dict[str, object]) -> bool | None:
@@ -542,6 +782,19 @@ class FixturePlanKindHandler(PlanKindHandler):
             asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
             comment, properties, column_comments = self._metadata_changes(changes, asset)
             return self._metadata_matches(asset, comment, properties, column_comments)
+        if self.kind in (w.PlanKind.ASSIGN_TAGS, w.PlanKind.REMOVE_TAGS):
+            asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
+            tag_delta = self._tag_changes(changes, asset)
+            current = {tag.key: tag for tag in self._tags_at(asset, tag_delta.column)}
+            if self.kind == w.PlanKind.ASSIGN_TAGS:
+                return all(
+                    (
+                        current.get(change.key) is not None
+                        and current[change.key].value == change.value
+                    )
+                    for change in tag_delta.tags
+                )
+            return all(change.key not in current for change in tag_delta.tags)
         return None
 
 
@@ -555,6 +808,8 @@ def register_fixture_plan_kinds(
             w.PlanKind.REVOKE,
             w.PlanKind.TRANSFER_OWNERSHIP,
             w.PlanKind.EDIT_METADATA,
+            w.PlanKind.ASSIGN_TAGS,
+            w.PlanKind.REMOVE_TAGS,
         )
     )
 
@@ -567,5 +822,7 @@ def register_connected_readonly_plan_kinds() -> tuple[RegisteredPlanKind, ...]:
             w.PlanKind.REVOKE,
             w.PlanKind.TRANSFER_OWNERSHIP,
             w.PlanKind.EDIT_METADATA,
+            w.PlanKind.ASSIGN_TAGS,
+            w.PlanKind.REMOVE_TAGS,
         )
     )

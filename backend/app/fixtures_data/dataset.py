@@ -25,6 +25,7 @@ from app.domain.models import (
     Principal,
     RowFilterRef,
     Tag,
+    TagPolicy,
 )
 
 OBSERVED = datetime(2026, 9, 20, 23, 10, 44, tzinfo=UTC)
@@ -136,6 +137,14 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
             input_columns=("id",),
             attached_via=AttachmentSource.DIRECT,
         ),
+        columns=(
+            replace(
+                orders.columns[0],
+                tags=(
+                    Tag(key="pii", value="identifier", kind=TagKind.GOVERNED, allowed_actions=()),
+                ),
+            ),
+        ),
         tags=(
             Tag(key="data_domain", value="sales", kind=TagKind.FREE_FORM, allowed_actions=()),
             Tag(key="sensitivity", value="internal", kind=TagKind.GOVERNED, allowed_actions=()),
@@ -171,6 +180,29 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
     model = result["REGISTERED_MODEL", "shared_ref.ml.demand_forecast"]
     result["REGISTERED_MODEL", model.full_name] = replace(model, raw={"versions": [1, 2]})
     return result
+
+
+def build_tag_policies() -> tuple[TagPolicy, ...]:
+    return (
+        TagPolicy(
+            key="sensitivity",
+            description="Approved data-sensitivity label.",
+            allowed_values=("public", "internal", "confidential"),
+            allowed_actions=(),
+        ),
+        TagPolicy(
+            key="pii",
+            description="Open set maintained by the classification program.",
+            allowed_values=None,
+            allowed_actions=(),
+        ),
+        TagPolicy(
+            key="retention",
+            description="No values are currently approved.",
+            allowed_values=(),
+            allowed_actions=(),
+        ),
+    )
 
 
 def build_principals() -> tuple[Principal, ...]:

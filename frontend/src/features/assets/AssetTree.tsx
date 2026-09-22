@@ -10,8 +10,9 @@ import {
   Table as TableIcon,
 } from "lucide-react";
 import { useCatalogs, useSchemaObjects, useSchemas } from "@/api/queries";
+import { isAbortError } from "@/api/errors";
 import { strings } from "@/lib/strings";
-import { LocalizedSkeleton } from "./StateViews";
+import { ErrorView, LocalizedSkeleton } from "./StateViews";
 import { UnknownBadge } from "./UnknownBadge";
 
 interface AssetTreeProps {
@@ -137,9 +138,13 @@ function SchemaNode({
             <li className="pl-6 py-1">
               <LocalizedSkeleton className="h-4 w-28" />
             </li>
-          ) : objectsQuery.isError ? (
-            <li className="pl-6 py-1 text-[11px] text-[var(--color-danger)]">
-              {strings.errors.generic}
+          ) : objectsQuery.isError && !isAbortError(objectsQuery.error) ? (
+            <li className="pl-6 py-1">
+              <ErrorView
+                error={objectsQuery.error}
+                onRetry={() => objectsQuery.refetch()}
+                compact
+              />
             </li>
           ) : objectsQuery.data?.data && objectsQuery.data.data.length > 0 ? (
             objectsQuery.data.data.map((obj) => (
@@ -236,9 +241,13 @@ function CatalogNode({
             <li className="py-1">
               <LocalizedSkeleton className="h-4 w-32" />
             </li>
-          ) : schemasQuery.isError ? (
-            <li className="py-1 text-[11px] text-[var(--color-danger)]">
-              {strings.errors.generic}
+          ) : schemasQuery.isError && !isAbortError(schemasQuery.error) ? (
+            <li className="py-1">
+              <ErrorView
+                error={schemasQuery.error}
+                onRetry={() => schemasQuery.refetch()}
+                compact
+              />
             </li>
           ) : schemasQuery.data?.data && schemasQuery.data.data.length > 0 ? (
             schemasQuery.data.data.map((s) => (
@@ -336,16 +345,13 @@ export function AssetTree({
           <LocalizedSkeleton className="h-6 w-5/6" />
           <LocalizedSkeleton className="h-6 w-4/6" />
         </div>
-      ) : catalogsQuery.isError ? (
-        <div className="p-3 text-[var(--text-xs)] text-[var(--color-danger)] bg-[var(--color-danger-bg)] rounded border border-[var(--color-danger)]/20">
-          <p className="font-[var(--weight-medium)]">{strings.errors.generic}</p>
-          <button
-            type="button"
-            onClick={() => catalogsQuery.refetch()}
-            className="mt-2 text-[var(--color-accent)] underline hover:text-[var(--color-accent-hover)]"
-          >
-            {strings.common.retry}
-          </button>
+      ) : catalogsQuery.isError && !isAbortError(catalogsQuery.error) ? (
+        <div className="py-1">
+          <ErrorView
+            error={catalogsQuery.error}
+            onRetry={() => catalogsQuery.refetch()}
+            compact
+          />
         </div>
       ) : catalogsQuery.data?.data && catalogsQuery.data.data.length > 0 ? (
         <ul className="space-y-1" role="tree">
@@ -364,6 +370,12 @@ export function AssetTree({
             />
           ))}
         </ul>
+      ) : catalogsQuery.isFetching ? (
+        <div className="space-y-2 py-1">
+          <LocalizedSkeleton className="h-6 w-full" />
+          <LocalizedSkeleton className="h-6 w-5/6" />
+          <LocalizedSkeleton className="h-6 w-4/6" />
+        </div>
       ) : (
         <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] italic py-2">
           {strings.assets.states.emptyCatalogs}

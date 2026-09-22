@@ -38,9 +38,9 @@ def now_utc() -> datetime:
 
 def canonical(value: object) -> bytes:
     """Stable bytes for hashes and HMACs; this never serializes a secret."""
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def state_hash(value: object) -> str:
@@ -92,9 +92,7 @@ class PlanKindRegistry:
     def get(self, kind: w.PlanKind) -> PlanKindHandler:
         handler = self._handlers.get(kind)
         if handler is None:
-            raise NotImplementedYet(
-                f"Plan kind '{kind.value}' is not implemented in this version."
-            )
+            raise NotImplementedYet(f"Plan kind '{kind.value}' is not implemented in this version.")
         return handler
 
 
@@ -248,10 +246,14 @@ class MutationEngine:
         if stored is None:
             raise NotFound()
         self._ensure_actor(stored.plan.identity, identity)
-        self._authorize(identity, stored.plan.kind, [
-            w.PlanTarget(securable_type=target.securable_type, full_name=target.full_name)
-            for target in stored.plan.targets
-        ])
+        self._authorize(
+            identity,
+            stored.plan.kind,
+            [
+                w.PlanTarget(securable_type=target.securable_type, full_name=target.full_name)
+                for target in stored.plan.targets
+            ],
+        )
         return stored.plan
 
     def _ensure_actor(self, owner: w.Identity, actor: w.Identity) -> None:

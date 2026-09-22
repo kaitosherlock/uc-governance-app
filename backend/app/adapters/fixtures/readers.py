@@ -12,9 +12,17 @@ from app.domain.models import (
     Grant,
     GrantSource,
     Principal,
+    Tag,
+    TagPolicy,
 )
 from app.errors import NotFound, ValidationFailed
-from app.fixtures_data.dataset import DEPENDENCIES, build_assets, build_grants, build_principals
+from app.fixtures_data.dataset import (
+    DEPENDENCIES,
+    build_assets,
+    build_grants,
+    build_principals,
+    build_tag_policies,
+)
 
 T = TypeVar("T")
 
@@ -38,6 +46,7 @@ class FixtureReaders:
         self.assets = build_assets()
         self.principals = build_principals()
         self.grants = build_grants()
+        self.tag_policies = build_tag_policies()
 
     def list_catalogs(
         self, page_size: int, page_token: str | None
@@ -119,6 +128,51 @@ class FixtureReaders:
             disclaimer="Missing dependency information is not proof that deletion is safe.",
         )
 
+    def tags(
+        self, securable_type: str, full_name: str
+    ) -> tuple[tuple[Tag, ...], dict[str, tuple[Tag, ...]]]:
+        asset = self.get_asset(securable_type, full_name)
+        return (
+            asset.tags,
+            {column.name: column.tags for column in asset.columns if column.tags},
+        )
+
+    def list_tag_policies(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[TagPolicy], str | None]:
+        return page(list(self.tag_policies), page_size, page_token, "tag-policies")
+
+    def update_tags(
+        self,
+        securable_type: str,
+        full_name: str,
+        column: str | None,
+        assign: tuple[Tag, ...],
+        remove: tuple[str, ...],
+    ) -> None:
+        asset = self.get_asset(securable_type, full_name)
+
+        def update(current: tuple[Tag, ...]) -> tuple[Tag, ...]:
+            assigned_keys = {item.key for item in assign}
+            values = [
+                tag for tag in current if tag.key not in remove and tag.key not in assigned_keys
+            ]
+            values.extend(assign)
+            return tuple(values)
+
+        if column is None:
+            self.assets[(securable_type, full_name)] = replace(asset, tags=update(asset.tags))
+            return
+        if not any(item.name == column for item in asset.columns):
+            raise ValidationFailed(f"Column '{column}' does not exist on '{full_name}'.")
+        self.assets[(securable_type, full_name)] = replace(
+            asset,
+            columns=tuple(
+                replace(item, tags=update(item.tags)) if item.name == column else item
+                for item in asset.columns
+            ),
+        )
+
     def update_grants(
         self,
         securable_type: str,
@@ -182,9 +236,7 @@ class FixtureReaders:
         self.assets[(securable_type, full_name)] = replace(
             asset,
             comment=(
-                asset.comment
-                if comment is METADATA_COMMENT_UNSET
-                else cast(str | None, comment)
+                asset.comment if comment is METADATA_COMMENT_UNSET else cast(str | None, comment)
             ),
             properties=values,
             columns=columns,

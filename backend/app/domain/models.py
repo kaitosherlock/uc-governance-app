@@ -74,6 +74,15 @@ class Tag:
 
 
 @dataclass(frozen=True, kw_only=True)
+class TagPolicy:
+    key: str
+    description: str | None
+    # None is an open value set; an empty tuple deliberately permits no values.
+    allowed_values: tuple[str, ...] | None
+    allowed_actions: tuple[AllowedAction, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
 class RowFilterRef:
     function_full_name: str
     input_columns: tuple[str, ...]

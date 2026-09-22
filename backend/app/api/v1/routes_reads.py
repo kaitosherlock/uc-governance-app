@@ -265,6 +265,57 @@ def get_grants(
 
 
 @router.get(
+    "/assets/{securable_type}/{full_name}/tags",
+    response_model=w.TagsResponse,
+    operation_id="getTags",
+    responses=responses(401, 403, 404, 500, 501, 503),
+)
+def get_tags(
+    securable_type: SecurableType, full_name: str, request: Request, svc: Service
+) -> w.TagsResponse:
+    target, tags, column_tags = svc.tags(securable_type, full_name)
+    bits = target_parts(securable_type, full_name)
+    return w.TagsResponse(
+        success=True,
+        data=w.TagsData(
+            target=mappers.map_AssetRef(target),
+            tags=[mappers.map_Tag(tag) for tag in tags],
+            column_tags={
+                column: [mappers.map_Tag(tag) for tag in values]
+                for column, values in column_tags.items()
+            },
+        ),
+        meta=meta(request, svc, bits[0], bits[1] if len(bits) > 1 else None),
+    )
+
+
+@router.get(
+    "/tag-policies",
+    response_model=w.TagPolicyListResponse,
+    operation_id="listTagPolicies",
+    responses=responses(401, 403, 500, 501, 503),
+)
+def list_tag_policies(
+    request: Request,
+    svc: Service,
+    page_size: PageSize = 50,
+    page_token: str | None = None,
+) -> w.TagPolicyListResponse:
+    values, token = svc.tag_policies(page_size, page_token)
+    return w.TagPolicyListResponse(
+        success=True,
+        data=[mappers.map_TagPolicy(value) for value in values],
+        meta=meta(
+            request,
+            svc,
+            limitations=["Governed tag assignment authority could not be determined."],
+            next_token=token,
+        ),
+        page=w.Page(page_size=page_size, next_page_token=token),
+    )
+
+
+@router.get(
     "/privileges",
     response_model=w.PrivilegeListResponse,
     operation_id="listPrivileges",

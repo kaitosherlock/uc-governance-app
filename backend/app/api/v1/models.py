@@ -386,6 +386,27 @@ class GrantsResponse(SuccessResponse[GrantsData]):
     pass
 
 
+class TagsData(ContractModel):
+    target: AssetRef
+    tags: list[Tag]
+    column_tags: dict[str, list[Tag]]
+
+
+class TagsResponse(SuccessResponse[TagsData]):
+    pass
+
+
+class TagPolicy(ContractModel):
+    key: str
+    description: str | None
+    allowed_values: list[str] | None
+    allowed_actions: list[AllowedAction]
+
+
+class TagPolicyListResponse(SuccessResponse[list[TagPolicy]]):
+    page: Page
+
+
 class PlanKind(StrEnum):
     GRANT = "grant"
     REVOKE = "revoke"

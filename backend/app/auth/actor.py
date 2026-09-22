@@ -39,17 +39,19 @@ async def resolve_identity(
         preferred_username = request.headers.get("x-forwarded-preferred-username")
         forwarded_user = request.headers.get("x-forwarded-user")
         if (
-            email is not None and (user.email is None or email.casefold() != user.email.casefold())
-        ) or (
-            preferred_username is not None
-            and (
-                user.email is None
-                or preferred_username.casefold() != user.email.casefold()
+            (
+                email is not None
+                and (user.email is None or email.casefold() != user.email.casefold())
             )
-        ) or (
-            forwarded_user is not None
-            and user.external_id
-            and forwarded_user != user.external_id
+            or (
+                preferred_username is not None
+                and (user.email is None or preferred_username.casefold() != user.email.casefold())
+            )
+            or (
+                forwarded_user is not None
+                and user.external_id
+                and forwarded_user != user.external_id
+            )
         ):
             logger.warning("Forwarded identity mismatch")
             raise IdentityMismatch()
