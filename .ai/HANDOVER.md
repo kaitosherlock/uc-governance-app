@@ -1,6 +1,6 @@
 # ORCHESTRATION HANDOVER STATE
 
-- **Timestamp**: 2026-09-22T06:55:00Z
+- **Timestamp**: 2026-09-22T13:34:00+07:00
 - **Current Phase**: Phase 0 — Foundations. P0-02, P0-03 and P0-04 complete and verified. The application runs.
 - **Active Task**: none. Both lanes are out of quota. Two tasks sit in the resume queue with their sessions intact.
 - **Deployed**: https://uc-governance-7474654536971820.aws.databricksapps.com (workspace dbc-76001947-638a, mode connected_readonly, RUNNING).
@@ -112,6 +112,13 @@ Open items that do not block Phase 0:
 - **eslint 9 is flagged unsupported by npm.** Kept deliberately so that jsx-a11y accessibility linting survives. Revisit when jsx-a11y supports eslint 10.
 - Deployment questions Q1 to Q8 remain open and change Phase 2 and Phase 4 scope, not Phase 0.
 
+## 2b. SCHEDULED CONTINUATION
+
+A persisted one-shot task `uc-governance-resume` fires at **2026-09-22T14:34:00+07:00**, two minutes
+after codex's stated reset of 2:32 PM. It re-enters this work with a self-contained prompt, because
+scheduled runs start with no memory of this session. It resumes the backend first, then probes the
+frontend, then continues down the task board. Managed from the Scheduled section of the sidebar.
+
 ## 3. NEXT IMMEDIATE ACTIONS (RESUME PROMPT)
 
 1. Confirm Gate 1: `uv run --no-project --with pyyaml --with jsonschema python scripts/validate_contracts.py` must print `OK: 15 checks passed`.
@@ -133,8 +140,8 @@ Open items that do not block Phase 0:
 
 | Agent | CLI | Status | Model by tier | Quota |
 |---|---|---|---|---|
-| Backend Coder | `codex` | READY | `gpt-6-astra` at effort high / medium / low | ok |
-| Frontend Coder | `agy` | READY | `claude-opus-4-6-thinking` / `claude-sonnet-4-6` / `gemini-3.8-flash-medium` | ok |
+| Backend Coder | `codex` | quota resets 14:32 local | `gpt-5.6-terra` at effort high / medium / low |
+| Frontend Coder | `agy` | exhausted later than codex; probe before use | `gemini-3.1-pro-high` / `gemini-3.8-flash-high` / `gemini-3.8-flash-medium` |
 
 Dispatch history: 2 smoke runs per lane, 3 backend dispatches, 4 frontend dispatches including one
 `-Continue` rejection. Observed cost: roughly 6k to 15k tokens per codex run, roughly 20k to 45k per

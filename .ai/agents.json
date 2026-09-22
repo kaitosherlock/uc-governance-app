@@ -24,11 +24,11 @@
       "session_resume_template": "codex exec resume {session} --model {model} --config model_reasoning_effort={effort} --skip-git-repo-check --output-last-message {lastmsg}",
       "session_resume_last_flag": "--last",
       "models": {
-        "tier_reasoning": "gpt-6-astra",
-        "tier_standard": "gpt-6-astra",
-        "tier_utility": "gpt-6-astra"
+        "tier_reasoning": "gpt-5.6-terra",
+        "tier_standard": "gpt-5.6-terra",
+        "tier_utility": "gpt-5.6-terra"
       },
-      "models_note": "The codex CLI exposes no model-listing subcommand, so only the configured default (~/.codex/config.toml model = gpt-6-astra) is verified to exist. Tiers are therefore differentiated by model_reasoning_effort rather than by model id. Do not invent other ids; if the user names one, verify it with a cheap `codex exec` probe before binding it.",
+      "models_note": "User directive 2026-09-22: switch codex to terra. The real slug is `gpt-5.6-terra`, extracted from the codex binary where it appears alongside gpt-6-astra and gpt-6-pro, including the provider-qualified forms openai.gpt-5.6-terra and global.openai.gpt-5.6-terra. It was NOT guessed from the word 'terra'. Tiers stay differentiated by model_reasoning_effort because the codex CLI exposes no model-listing subcommand.",
       "effort_values": {
         "tier_reasoning": "high",
         "tier_standard": "medium",
@@ -40,7 +40,12 @@
         "last_ok_at": "2026-09-22T03:59:33.7475259Z",
         "note": "Set to exhausted by dispatch.ps1 when the output matches a quota signature; cleared by resume.ps1 after a successful probe."
       },
-      "session_resume_note": "`codex exec resume` accepts a NARROWER flag set than `codex exec`: it rejects --sandbox, --cd and --color. Those are inherited from the original session. Verified 2026-09-21 from `codex exec resume --help`. The working directory comes from the process cwd, which the dispatcher sets to the project root."
+      "session_resume_note": "`codex exec resume` accepts a NARROWER flag set than `codex exec`: it rejects --sandbox, --cd and --color. Those are inherited from the original session. Verified 2026-09-21 from `codex exec resume --help`. The working directory comes from the process cwd, which the dispatcher sets to the project root.",
+      "models_previous": {
+        "tier_reasoning": "gpt-6-astra",
+        "tier_standard": "gpt-6-astra",
+        "tier_utility": "gpt-6-astra"
+      }
     },
     "frontend": {
       "role": "Frontend Coder",
@@ -63,12 +68,13 @@
       "session_resume_template": "agy --conversation {session} --model {model} --output-format json --add-dir {root} --mode accept-edits",
       "session_resume_last_flag": "--continue",
       "models": {
-        "tier_reasoning": "claude-opus-4-6-thinking",
-        "tier_standard": "claude-sonnet-4-6",
+        "tier_reasoning": "gemini-3.1-pro-high",
+        "tier_standard": "gemini-3.8-flash-high",
         "tier_utility": "gemini-3.8-flash-medium"
       },
       "models_alternate": {
-        "tier_reasoning": "gemini-3.1-pro-high"
+        "tier_reasoning": "gemini-3.1-pro-low",
+        "tier_standard": "gemini-3.7-flash-high"
       },
       "models_available": [
         "gemini-3.8-flash-high",
@@ -94,7 +100,13 @@
       },
       "prompt_mode_reason": "Windows PowerShell 5.1 re-splits a long multi-line native argument on whitespace, which turned prompt text such as --noEmit into a CLI flag. The prompt is written to a file and passed as one whitespace-free pointer token. Verified 2026-09-21.",
       "effort_note": "agy encodes reasoning effort in the model id itself, e.g. gemini-3.8-flash-medium. Passing --effort alongside such a model is rejected as a conflict, so --effort is not used on this lane; the tier is expressed entirely by the model id. Verified 2026-09-21.",
-      "output_note": "--output-format json returns {conversation_id, status, response, duration_seconds, num_turns, usage}. conversation_id enables precise resume; text format prints no id and would force a fallback to --continue. Verified 2026-09-21."
+      "output_note": "--output-format json returns {conversation_id, status, response, duration_seconds, num_turns, usage}. conversation_id enables precise resume; text format prints no id and would force a fallback to --continue. Verified 2026-09-21.",
+      "models_previous": {
+        "tier_reasoning": "claude-opus-4-6-thinking",
+        "tier_standard": "claude-sonnet-4-6",
+        "tier_utility": "gemini-3.8-flash-medium"
+      },
+      "models_note": "User directive 2026-09-22: run Antigravity on Gemini only. The Claude and GPT entries are deliberately left in models_available as a record of what the CLI offers, but no tier binds to them. Every id here was taken from `agy models`. agy encodes reasoning effort in the model id, so --effort is never passed."
     }
   },
   "tiers": {
