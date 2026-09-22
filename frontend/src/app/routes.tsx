@@ -13,6 +13,7 @@ import type { RouteObject } from "react-router";
 import { AppShell } from "./AppShell";
 import { PageHeader } from "./PageHeader";
 import { strings } from "@/lib/strings";
+import { DataAssetsView } from "@/features/assets/DataAssetsView";
 
 /* ---------- Page components ---------- */
 
@@ -23,24 +24,6 @@ function PlaceholderContent({ text }: { text: string }) {
         {text}
       </p>
     </div>
-  );
-}
-
-function DataAssetsPage() {
-  return (
-    <>
-      <PageHeader title={strings.pages.dataAssets} description={strings.descriptions.dataAssets} />
-      <PlaceholderContent text={strings.unavailable.dataAssets} />
-    </>
-  );
-}
-
-function AssetDetailPage() {
-  return (
-    <>
-      <PageHeader title={strings.pages.asset} description={strings.descriptions.assetDetail} />
-      <PlaceholderContent text={strings.unavailable.assetDetail} />
-    </>
   );
 }
 
@@ -98,39 +81,39 @@ const routes: RouteObject[] = [
       /* Data Assets — default route */
       {
         index: true,
-        element: <DataAssetsPage />,
+        element: <DataAssetsView />,
       },
       {
         path: "assets",
         children: [
           {
             index: true,
-            element: <DataAssetsPage />,
+            element: <DataAssetsView />,
           },
           {
             path: ":catalog",
             children: [
               {
                 index: true,
-                element: <AssetDetailPage />,
+                element: <DataAssetsView />,
               },
               {
                 path: ":schema",
                 children: [
                   {
                     index: true,
-                    element: <AssetDetailPage />,
+                    element: <DataAssetsView />,
                   },
                   {
                     path: ":objectType",
                     children: [
                       {
                         index: true,
-                        element: <AssetDetailPage />,
+                        element: <DataAssetsView />,
                       },
                       {
                         path: ":name",
-                        element: <AssetDetailPage />,
+                        element: <DataAssetsView />,
                       },
                     ],
                   },

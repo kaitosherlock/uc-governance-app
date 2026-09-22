@@ -7,9 +7,15 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import type {
+  AssetDetail,
+  AssetSummary,
   Capability,
   Context,
+  DependenciesData,
   Identity,
+  ObjectKind,
+  PagedResponse,
+  SecurableType,
   SuccessResponse,
 } from "@contracts/types";
 import { API_PATHS } from "@contracts/types";
@@ -87,6 +93,237 @@ export function useCapabilities(
     ],
     queryFn: ({ signal }) =>
       apiGet<Capability[]>(API_PATHS.capabilities, { signal }),
+    staleTime: DEFAULT_STALE_TIME,
+    retry(failureCount, error) {
+      if (isClientError(error)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export interface CatalogsQueryOptions {
+  query?: string | undefined;
+  page_token?: string | undefined;
+  page_size?: number | undefined;
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch catalogs visible to executing identity. */
+export function useCatalogs(options?: CatalogsQueryOptions) {
+  return useQuery<PagedResponse<AssetSummary>, unknown>({
+    queryKey: [
+      "catalogs",
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+        query: options?.query ?? null,
+        page_token: options?.page_token ?? null,
+        page_size: options?.page_size ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      const queryParams: Record<string, string | number | undefined> = {};
+      if (options?.query) queryParams["query"] = options.query;
+      if (options?.page_token) queryParams["page_token"] = options.page_token;
+      if (options?.page_size !== undefined) queryParams["page_size"] = options.page_size;
+
+      const res = await apiGet<AssetSummary[]>(API_PATHS.catalogs, {
+        query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        signal,
+      });
+      return res as unknown as PagedResponse<AssetSummary>;
+    },
+    enabled: options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry(failureCount, error) {
+      if (isClientError(error)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export interface SchemasQueryOptions {
+  query?: string | undefined;
+  page_token?: string | undefined;
+  page_size?: number | undefined;
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch schemas in a catalog. */
+export function useSchemas(
+  catalog: string | null | undefined,
+  options?: SchemasQueryOptions,
+) {
+  return useQuery<PagedResponse<AssetSummary>, unknown>({
+    queryKey: [
+      "schemas",
+      catalog ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+        query: options?.query ?? null,
+        page_token: options?.page_token ?? null,
+        page_size: options?.page_size ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!catalog) throw new Error("Catalog is required to fetch schemas");
+
+      const queryParams: Record<string, string | number | undefined> = {};
+      if (options?.query) queryParams["query"] = options.query;
+      if (options?.page_token) queryParams["page_token"] = options.page_token;
+      if (options?.page_size !== undefined) queryParams["page_size"] = options.page_size;
+
+      const res = await apiGet<AssetSummary[]>(API_PATHS.schemas, {
+        params: { catalog },
+        query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        signal,
+      });
+      return res as unknown as PagedResponse<AssetSummary>;
+    },
+    enabled: Boolean(catalog) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry(failureCount, error) {
+      if (isClientError(error)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export interface SchemaObjectsQueryOptions {
+  kind?: ObjectKind[] | undefined;
+  owner?: string | undefined;
+  query?: string | undefined;
+  page_token?: string | undefined;
+  page_size?: number | undefined;
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch objects (tables, views, volumes, etc.) in a schema. */
+export function useSchemaObjects(
+  catalog: string | null | undefined,
+  schema: string | null | undefined,
+  options?: SchemaObjectsQueryOptions,
+) {
+  return useQuery<PagedResponse<AssetSummary>, unknown>({
+    queryKey: [
+      "schemaObjects",
+      catalog ?? null,
+      schema ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+        kind: options?.kind ?? null,
+        owner: options?.owner ?? null,
+        query: options?.query ?? null,
+        page_token: options?.page_token ?? null,
+        page_size: options?.page_size ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!catalog || !schema) throw new Error("Catalog and schema are required");
+
+      const queryParams: Record<string, string | number | undefined> = {};
+      if (options?.kind && options.kind.length > 0) {
+        queryParams["kind"] = options.kind.join(",");
+      }
+      if (options?.owner) queryParams["owner"] = options.owner;
+      if (options?.query) queryParams["query"] = options.query;
+      if (options?.page_token) queryParams["page_token"] = options.page_token;
+      if (options?.page_size !== undefined) queryParams["page_size"] = options.page_size;
+
+      const res = await apiGet<AssetSummary[]>(API_PATHS.schemaObjects, {
+        params: { catalog, schema },
+        query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        signal,
+      });
+      return res as unknown as PagedResponse<AssetSummary>;
+    },
+    enabled: Boolean(catalog && schema) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry(failureCount, error) {
+      if (isClientError(error)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export interface AssetQueryOptions {
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+}
+
+/** Hook to fetch one asset detail by securable_type and full_name. */
+export function useAsset(
+  securableType: SecurableType | string | null | undefined,
+  fullName: string | null | undefined,
+  options?: AssetQueryOptions,
+) {
+  return useQuery<SuccessResponse<AssetDetail>, unknown>({
+    queryKey: [
+      "asset",
+      securableType ?? null,
+      fullName ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!securableType || !fullName) {
+        throw new Error("securableType and fullName are required");
+      }
+      return apiGet<AssetDetail>(API_PATHS.asset, {
+        params: { securable_type: securableType, full_name: fullName },
+        signal,
+      });
+    },
+    enabled: Boolean(securableType && fullName),
+    staleTime: DEFAULT_STALE_TIME,
+    retry(failureCount, error) {
+      if (isClientError(error)) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export interface AssetDependenciesQueryOptions {
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+}
+
+/** Hook to fetch dependencies for an asset. */
+export function useAssetDependencies(
+  securableType: SecurableType | string | null | undefined,
+  fullName: string | null | undefined,
+  options?: AssetDependenciesQueryOptions,
+) {
+  return useQuery<SuccessResponse<DependenciesData>, unknown>({
+    queryKey: [
+      "assetDependencies",
+      securableType ?? null,
+      fullName ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!securableType || !fullName) {
+        throw new Error("securableType and fullName are required");
+      }
+      return apiGet<DependenciesData>(API_PATHS.assetDependencies, {
+        params: { securable_type: securableType, full_name: fullName },
+        signal,
+      });
+    },
+    enabled: Boolean(securableType && fullName),
     staleTime: DEFAULT_STALE_TIME,
     retry(failureCount, error) {
       if (isClientError(error)) return false;
