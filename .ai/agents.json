@@ -93,8 +93,8 @@
                                                              "gpt-oss-120b-medium"
                                                          ],
                                     "quota":  {
-                                                  "state":  "ok",
-                                                  "exhausted_at":  null,
+                                                  "state":  "exhausted",
+                                                  "exhausted_at":  "2026-09-22T07:55:45.5624705Z",
                                                   "last_ok_at":  "2026-09-22T07:53:56.0718823Z",
                                                   "note":  "Same handling as the backend lane."
                                               },

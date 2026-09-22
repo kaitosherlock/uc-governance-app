@@ -1,12 +1,29 @@
 /**
  * providers.tsx — Application-level providers.
  *
- * For now, only sets up the router. TanStack Query belongs in P0-05
- * with the API client.
+ * Provides TanStack QueryClient and React Router.
  */
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router";
 import { router } from "./routes";
 
+export function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+}
+
 export function AppProviders() {
-  return <RouterProvider router={router} />;
+  const [queryClient] = useState(() => createQueryClient());
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }

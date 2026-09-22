@@ -2,9 +2,9 @@
     "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T075356Z-frontend-P0-05.log",
     "tier":  "tier_utility",
     "agent":  "frontend",
-    "seconds":  384,
+    "seconds":  108,
     "correction_note":  "Recorded as completed by a detector bug: agy exited 0 while its JSON result said status ERROR with \"Individual quota reached\". Corrected by hand and the detector now treats an explicit failure status as a failed run regardless of exit code.",
-    "finished_at":  "2026-09-22T07:52:09.7693663Z",
+    "finished_at":  "2026-09-22T07:55:45.5248065Z",
     "quota_pattern":  "individual quota reached",
     "model":  "gemini-3.8-flash-medium",
     "started_at":  "2026-09-22T07:53:56.9281639Z",
@@ -23,13 +23,14 @@
                     "2026-09-22T07:43:18.8580574Z quota_exhausted",
                     "2026-09-22T07:45:45.5437792Z dispatched",
                     "2026-09-22T07:52:09.7784094Z quota_exhausted",
-                    "2026-09-22T07:53:56.9465613Z dispatched"
+                    "2026-09-22T07:53:56.9465613Z dispatched",
+                    "2026-09-22T07:55:45.5526768Z quota_exhausted"
                 ],
     "task_id":  "P0-05",
     "prompt_chars":  4037,
     "effort":  "medium",
     "exit_code":  0,
-    "status":  "dispatched",
+    "status":  "quota_exhausted",
     "attempt":  6,
     "prompt_file":  ".ai/prompts/P0-05-gate3-reject2.md"
 }

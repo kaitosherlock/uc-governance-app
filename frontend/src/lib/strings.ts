@@ -38,6 +38,10 @@ export const strings = {
       "You are requesting this change. It will be executed by the application's service principal {name}.",
     noScope: "No catalogs in scope",
     unknownWorkspace: "Unknown workspace",
+    limitationsPrefix: "Limitations:",
+    errorDetails: "Technical details",
+    actorAriaLabel: "Signed in as {name}",
+    executorAriaLabel: "Actions run as {name}",
   },
 
   /** Common labels */
@@ -148,6 +152,94 @@ export const strings = {
       "Credential management, external location editing, and sharing configuration are not available yet.",
     notFound:
       "Use the navigation on the left to get back to a section you can open.",
+  },
+
+  /** Error codes mapping (all 21 ErrorCode values) */
+  errorCodes: {
+    VALIDATION_FAILED: {
+      title: "Validation failed",
+      body: "Request body or query parameters failed validation.",
+    },
+    UNAUTHENTICATED: {
+      title: "Sign-in required",
+      body: "Sign-in is required through Databricks.",
+    },
+    IDENTITY_MISMATCH: {
+      title: "Identity mismatch",
+      body: "Token identity disagrees with forwarded identity headers.",
+    },
+    FORBIDDEN_ROLE: {
+      title: "Forbidden role",
+      body: "Your application role does not have permission for this action.",
+    },
+    FORBIDDEN_SCOPE: {
+      title: "Forbidden scope",
+      body: "This object is outside the managed scope of this application.",
+    },
+    MODE_READ_ONLY: {
+      title: "Read-only mode",
+      body: "This application is currently in read-only mode.",
+    },
+    INSUFFICIENT_PRIVILEGES: {
+      title: "Insufficient privileges",
+      body: "The execution identity lacks required Unity Catalog privileges.",
+    },
+    SOD_VIOLATION: {
+      title: "Segregation of duties violation",
+      body: "Requester cannot approve their own change, or beneficiary cannot approve.",
+    },
+    NOT_FOUND: {
+      title: "Not found",
+      body: "Not found or not visible to the application.",
+    },
+    PLAN_STALE: {
+      title: "Plan stale",
+      body: "Observed state changed since preview was generated.",
+    },
+    PLAN_EXPIRED: {
+      title: "Plan expired",
+      body: "Plan time-to-live has passed.",
+    },
+    PLAN_TAMPERED: {
+      title: "Plan tampered",
+      body: "Plan cryptographic signature verification failed.",
+    },
+    PLAN_INVALIDATED: {
+      title: "Plan invalidated",
+      body: "A newer preview has replaced this plan.",
+    },
+    DUPLICATE_SUBMISSION: {
+      title: "Duplicate submission",
+      body: "An operation for this plan is already running.",
+    },
+    RATE_LIMITED: {
+      title: "Rate limited",
+      body: "Databricks is rate-limiting requests. Try again in a moment.",
+    },
+    INTERNAL_ERROR: {
+      title: "Internal error",
+      body: "An unexpected error occurred.",
+    },
+    NOT_IMPLEMENTED: {
+      title: "Not implemented",
+      body: "Capability not built in this version.",
+    },
+    UNSUPPORTED: {
+      title: "Unsupported",
+      body: "No documented supported mechanism for this operation.",
+    },
+    NOT_CONFIGURED: {
+      title: "Not configured",
+      body: "Required backend service or warehouse is not configured.",
+    },
+    UPSTREAM_UNAVAILABLE: {
+      title: "Upstream unavailable",
+      body: "Upstream Databricks service is temporarily unavailable.",
+    },
+    OUTCOME_UNKNOWN: {
+      title: "Outcome unknown",
+      body: "Operation outcome unknown. Check current state.",
+    },
   },
 } as const;
 

@@ -3,7 +3,7 @@
  *
  * Structure:
  *  1. Skip-to-content link (first focusable element)
- *  2. ContextBar (header, role="banner")
+ *  2. ContextBar (header, role="banner") wired to real hooks
  *  3. Left rail nav with product name, collapses to icons < 1024px
  *  4. Main content region (<main id="main">)
  *
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { strings } from "@/lib/strings";
+import { useAppContext, useMe } from "@/api/queries";
+import { describeError } from "@/api/errors";
 import { ContextBar } from "./ContextBar";
 
 /* ---- Navigation items ---- */
@@ -80,6 +82,17 @@ export function AppShell() {
   const mainItems = navItems.filter((i) => i.group === "main");
   const platformItems = navItems.filter((i) => i.group === "platform");
 
+  const contextQuery = useAppContext();
+  const meQuery = useMe();
+
+  const loading = contextQuery.isLoading || meQuery.isLoading;
+  const activeError = contextQuery.error || meQuery.error;
+  const errorDesc = activeError ? describeError(activeError) : null;
+
+  const context = contextQuery.data?.data ?? null;
+  const identity = meQuery.data?.data ?? null;
+  const limitations = contextQuery.data?.meta.limitations;
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Skip to content — first focusable element */}
@@ -90,8 +103,14 @@ export function AppShell() {
         {strings.app.skipToContent}
       </a>
 
-      {/* Context bar — no data in this task, shows "not connected" */}
-      <ContextBar context={null} identity={null} loading={false} />
+      {/* Context bar — wired to real data */}
+      <ContextBar
+        context={context}
+        identity={identity}
+        loading={loading}
+        error={errorDesc}
+        limitations={limitations}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left rail navigation */}
