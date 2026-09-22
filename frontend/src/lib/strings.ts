@@ -106,22 +106,48 @@ export const strings = {
     notFound: "Page not found",
   },
 
-  /** Descriptions for sections that are not yet available */
+  /**
+   * One-line header descriptions — the answer to "what is this section for".
+   * Used as the `description` prop on PageHeader. Never duplicate a string
+   * from `strings.unavailable`.
+   */
   descriptions: {
     dataAssets:
-      "Browse catalogs, schemas, and tables to see who can access them. Asset search is not available yet.",
+      "Browse catalogs, schemas, and tables to see who can access them.",
     assetDetail:
-      "View asset details including ownership, access grants, tags, lineage, and quality. This section is not available yet.",
+      "View ownership, access grants, tags, lineage, and quality for a specific asset.",
     accessManagement:
-      "Manage grants, revocations, and ownership transfers across your catalog. Review and approve access changes. This section is not available yet.",
+      "Manage grants, revocations, and ownership transfers across your catalog.",
     policies:
-      "Define attribute-based access policies, row filters, column masks, and governed tags. This section is not available yet.",
+      "Define attribute-based access policies, row filters, column masks, and governed tags.",
     activity:
-      "Review Databricks audit events, application activity, and governance findings. This section is not available yet.",
+      "Review Databricks audit events, application activity, and governance findings.",
     platform:
-      "Manage storage credentials, external locations, workspace bindings, connections, and sharing. This section is not available yet.",
+      "Manage storage credentials, external locations, workspace bindings, connections, and sharing.",
     notFound:
-      "That page does not exist. Use the navigation to get back to a section you can open.",
+      "That page does not exist.",
+  },
+
+  /**
+   * Body text for sections that are not yet built — what the person can do
+   * right now and what is missing. Used in the section body, never in the
+   * header. Never duplicate a string from `strings.descriptions`.
+   */
+  unavailable: {
+    dataAssets:
+      "Asset search and the access table are not available yet. Use the navigation to explore the other sections.",
+    assetDetail:
+      "The asset detail view is not available yet. Return to Data Assets to browse the catalog tree.",
+    accessManagement:
+      "The grant queue, access requests, and approval reviews are not available yet. Use Data Assets to view current grants.",
+    policies:
+      "Policy editing and the attribute-based access rule builder are not available yet. Check back when a later section is enabled.",
+    activity:
+      "Audit event browsing and governance findings are not available yet. Other sections are available now.",
+    platform:
+      "Credential management, external location editing, and sharing configuration are not available yet.",
+    notFound:
+      "Use the navigation on the left to get back to a section you can open.",
   },
 } as const;
 

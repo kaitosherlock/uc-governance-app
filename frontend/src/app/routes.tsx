@@ -4,8 +4,9 @@
  * Scope lives in the URL as specified in docs/02-architecture.md §8:
  * /assets/:catalog?/:schema?/:objectType?/:name? with a `tab` search parameter.
  *
- * Every route renders a PageHeader with an h1, plus a left-aligned content
- * section that honestly states the section is not yet available.
+ * Every route renders a PageHeader (h1 + purpose description) and a
+ * PlaceholderContent (body text saying what is available now vs. missing).
+ * The two text slots always come from different keys in strings.ts.
  */
 import { createBrowserRouter } from "react-router";
 import type { RouteObject } from "react-router";
@@ -29,7 +30,7 @@ function DataAssetsPage() {
   return (
     <>
       <PageHeader title={strings.pages.dataAssets} description={strings.descriptions.dataAssets} />
-      <PlaceholderContent text={strings.descriptions.dataAssets} />
+      <PlaceholderContent text={strings.unavailable.dataAssets} />
     </>
   );
 }
@@ -38,7 +39,7 @@ function AssetDetailPage() {
   return (
     <>
       <PageHeader title={strings.pages.asset} description={strings.descriptions.assetDetail} />
-      <PlaceholderContent text={strings.descriptions.assetDetail} />
+      <PlaceholderContent text={strings.unavailable.assetDetail} />
     </>
   );
 }
@@ -47,7 +48,7 @@ function AccessManagementPage() {
   return (
     <>
       <PageHeader title={strings.pages.accessManagement} description={strings.descriptions.accessManagement} />
-      <PlaceholderContent text={strings.descriptions.accessManagement} />
+      <PlaceholderContent text={strings.unavailable.accessManagement} />
     </>
   );
 }
@@ -56,7 +57,7 @@ function PoliciesPage() {
   return (
     <>
       <PageHeader title={strings.pages.policies} description={strings.descriptions.policies} />
-      <PlaceholderContent text={strings.descriptions.policies} />
+      <PlaceholderContent text={strings.unavailable.policies} />
     </>
   );
 }
@@ -65,7 +66,7 @@ function ActivityPage() {
   return (
     <>
       <PageHeader title={strings.pages.activity} description={strings.descriptions.activity} />
-      <PlaceholderContent text={strings.descriptions.activity} />
+      <PlaceholderContent text={strings.unavailable.activity} />
     </>
   );
 }
@@ -74,7 +75,7 @@ function PlatformPage() {
   return (
     <>
       <PageHeader title={strings.pages.platform} description={strings.descriptions.platform} />
-      <PlaceholderContent text={strings.descriptions.platform} />
+      <PlaceholderContent text={strings.unavailable.platform} />
     </>
   );
 }
@@ -82,8 +83,8 @@ function PlatformPage() {
 function NotFoundPage() {
   return (
     <>
-      <PageHeader title={strings.pages.notFound} />
-      <PlaceholderContent text={strings.descriptions.notFound} />
+      <PageHeader title={strings.pages.notFound} description={strings.descriptions.notFound} />
+      <PlaceholderContent text={strings.unavailable.notFound} />
     </>
   );
 }
