@@ -96,7 +96,7 @@
                                     "quota":  {
                                                   "state":  "ok",
                                                   "exhausted_at":  null,
-                                                  "last_ok_at":  "2026-09-22T15:21:31.4960532Z",
+                                                  "last_ok_at":  "2026-09-22T15:41:00.6725399Z",
                                                   "note":  "Same handling as the backend lane.",
                                                   "cleared_by":  "User reported the Antigravity Gemini dashboard at 2026-09-22 15:20 local: 94% of the weekly limit and 89% of the 5-hour limit remaining. The earlier exhaustion was per model on the higher tier, not lane-wide."
                                               },

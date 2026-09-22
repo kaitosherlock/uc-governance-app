@@ -1,44 +1,6 @@
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import path from "node:path";
-import fs from "node:fs";
 import { strings } from "@/lib/strings";
-
-const cwd = process.cwd();
-const SCREENSHOTS_DIR = cwd.endsWith("frontend")
-  ? path.resolve(cwd, "../screenshots")
-  : path.resolve(cwd, "screenshots");
-
-async function captureScreenshots(page: any, screenName: string) {
-  fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, `synthetic-${screenName}-1440.png`),
-  });
-
-  await page.setViewportSize({ width: 375, height: 667 });
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, `synthetic-${screenName}-375.png`),
-  });
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-}
-
-async function runA11yScan(page: any, contextName: string) {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-
-  const seriousOrCritical = results.violations.filter(
-    (v) => v.impact === "critical" || v.impact === "serious"
-  );
-
-  expect(
-    seriousOrCritical,
-    `Accessibility violations (${seriousOrCritical.length}) in ${contextName}: ${JSON.stringify(seriousOrCritical, null, 2)}`
-  ).toEqual([]);
-}
+import { captureScreenshots, runA11yScan } from "./helpers";
 
 test("Journey 1: find table, read access, preview grant, apply, and verify @a11y", async ({ page }) => {
   // Pin clock into the frozen fixture window
@@ -163,17 +125,25 @@ test("Journey 1: find table, read access, preview grant, apply, and verify @a11y
   await expect(outcomeHeading).toBeVisible();
 
   // Per-target row
-  await expect(dialog.getByText("sales.crm.orders")).toBeVisible();
+  const targetsSection = dialog
+    .getByRole("heading", {
+      level: 4,
+      name: strings.planFlow.outcome.targetsHeading,
+    })
+    .locator("..");
+  await expect(targetsSection.getByText("sales.crm.orders", { exact: true })).toBeVisible();
 
   // Verified badge
   await expect(dialog.getByText(strings.planFlow.outcome.verifiedBadge)).toBeVisible();
 
-  // Outcome title
-  await expect(dialog.getByText(strings.planFlow.outcome.appliedTitle)).toBeVisible();
+  // 9. Assert outcome persists in-page (no transient toast auto-dismiss) and no Undo is offered
+  const toastContainers = page.locator(".toast, [data-sonner-toaster]");
+  await expect(toastContainers).toHaveCount(0);
 
-  // 9. Assert no toast is the only feedback and no Undo is offered
-  const toastElements = page.locator("[role='status'], .toast, [data-sonner-toaster]");
-  await expect(toastElements).toHaveCount(0);
+  // Outcome panel persists in-page rather than auto-dismissing
+  await page.waitForTimeout(1000);
+  await expect(outcomeHeading).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: strings.planFlow.outcome.appliedTitle })).toBeVisible();
 
   const undoBtn = page.getByRole("button", { name: /undo/i });
   await expect(undoBtn).toHaveCount(0);
@@ -183,3 +153,4 @@ test("Journey 1: find table, read access, preview grant, apply, and verify @a11y
   // Capture Execution Outcome screenshots
   await captureScreenshots(page, "grant-outcome");
 });
+

@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { setupServer } from "msw/node";
 import { http, HttpResponse, delay } from "msw";
 import type { Operation, ErrorResponse } from "@contracts/types";
-import { apiGet, apiPost, buildUrl } from "../client";
+import { apiGet, apiPost, buildUrl, getActiveDevScenario } from "../client";
 import { ApiError, AbortError } from "../errors";
 
 const server = setupServer(
@@ -152,4 +152,44 @@ describe("apiClient", () => {
     expect(result.success).toBe(true);
     expect(result.data.full_name).toBe("sales.crm.orders");
   });
+
+  describe("scenario propagation", () => {
+    afterEach(() => {
+      window.history.pushState({}, "", "/");
+    });
+
+    it("extracts scenario from window.location.search in dev mode", () => {
+      window.history.pushState({}, "", "/test?scenario=unknown-outcome");
+      expect(getActiveDevScenario(true)).toBe("unknown-outcome");
+    });
+
+    it("returns undefined in production mode regardless of window.location", () => {
+      window.history.pushState({}, "", "/test?scenario=unknown-outcome");
+      expect(getActiveDevScenario(false)).toBeUndefined();
+    });
+
+    it("propagates scenario into buildUrl in dev mode", () => {
+      window.history.pushState({}, "", "/test?scenario=unknown-outcome");
+      const url = buildUrl("/assets/TABLE/test", undefined, undefined, true);
+      expect(url).toBe("/api/v1/assets/TABLE/test?scenario=unknown-outcome");
+    });
+
+    it("never propagates scenario into buildUrl in production mode", () => {
+      window.history.pushState({}, "", "/test?scenario=unknown-outcome");
+      const url = buildUrl("/assets/TABLE/test", undefined, undefined, false);
+      expect(url).toBe("/api/v1/assets/TABLE/test");
+    });
+
+    it("preserves explicitly passed scenario parameter over window.location in dev mode", () => {
+      window.history.pushState({}, "", "/test?scenario=unknown-outcome");
+      const url = buildUrl(
+        "/assets/TABLE/test",
+        undefined,
+        { scenario: "custom-scenario" },
+        true,
+      );
+      expect(url).toBe("/api/v1/assets/TABLE/test?scenario=custom-scenario");
+    });
+  });
 });
+

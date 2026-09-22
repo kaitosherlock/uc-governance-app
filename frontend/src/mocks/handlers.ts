@@ -582,9 +582,13 @@ const operationDuplicateFixture = {
   },
 };
 
-async function handleScenario(
+export type EndpointKind = "read" | "plan" | "execute" | "operation";
+
+export async function handleScenario(
   scenario: string | null,
+  endpointKind: EndpointKind,
 ): Promise<Response | null> {
+  // Transport-level scenarios apply to all endpoints
   if (scenario === "slow") {
     await delay(2000);
     return null;
@@ -597,58 +601,6 @@ async function handleScenario(
   }
   if (scenario === "validation") {
     return HttpResponse.json(errorValidationFailed, { status: 400 });
-  }
-  if (scenario === "unknown-outcome") {
-    return HttpResponse.json(operationUnknownOutcome, { status: 202 });
-  }
-  if (scenario === "stale") {
-    return HttpResponse.json(
-      {
-        success: false,
-        code: "PLAN_STALE",
-        message: "The state changed since this preview was generated.",
-        correlation_id: "c0ffee00-0000-4000-8000-000000000041",
-        next_steps: ["Regenerate the preview before applying this change."],
-      },
-      { status: 409 },
-    );
-  }
-  if (scenario === "expired") {
-    return HttpResponse.json(
-      {
-        success: false,
-        code: "PLAN_EXPIRED",
-        message: "This preview has expired.",
-        correlation_id: "c0ffee00-0000-4000-8000-000000000042",
-        next_steps: ["Regenerate the preview before applying this change."],
-      },
-      { status: 409 },
-    );
-  }
-  if (scenario === "invalidated") {
-    return HttpResponse.json(
-      {
-        success: false,
-        code: "PLAN_INVALIDATED",
-        message: "This preview has been invalidated.",
-        correlation_id: "c0ffee00-0000-4000-8000-000000000043",
-        next_steps: ["Regenerate the preview."],
-      },
-      { status: 409 },
-    );
-  }
-  if (scenario === "duplicate") {
-    return HttpResponse.json(
-      {
-        success: false,
-        code: "DUPLICATE_SUBMISSION",
-        message: "An operation already exists for this preview.",
-        correlation_id: "c0ffee00-0000-4000-8000-000000000044",
-        next_steps: ["Open the existing operation instead of submitting again."],
-        errors: [{ field: "operation_id", code: "DUPLICATE", message: "op-duplicate-123" }],
-      },
-      { status: 409 },
-    );
   }
   if (scenario === "not-found") {
     return HttpResponse.json(
@@ -674,6 +626,128 @@ async function handleScenario(
       { status: 500 },
     );
   }
+
+  // Mutation-lifecycle scenarios: read endpoints ignore these and serve normal payloads
+  if (endpointKind === "read") {
+    return null;
+  }
+
+  // Plan creation & lifecycle scenarios (POST /plans, GET /plans/:id)
+  if (endpointKind === "plan") {
+    if (scenario === "stale") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "PLAN_STALE",
+          message: "The state changed since this preview was generated.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000041",
+          next_steps: ["Regenerate the preview before applying this change."],
+        },
+        { status: 409 },
+      );
+    }
+    if (scenario === "expired") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "PLAN_EXPIRED",
+          message: "This preview has expired.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000042",
+          next_steps: ["Regenerate the preview before applying this change."],
+        },
+        { status: 409 },
+      );
+    }
+    if (scenario === "invalidated") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "PLAN_INVALIDATED",
+          message: "This preview has been invalidated.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000043",
+          next_steps: ["Regenerate the preview."],
+        },
+        { status: 409 },
+      );
+    }
+    if (scenario === "duplicate") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "DUPLICATE_SUBMISSION",
+          message: "An operation already exists for this preview.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000044",
+          next_steps: ["Open the existing operation instead of submitting again."],
+          errors: [{ field: "operation_id", code: "DUPLICATE", message: "op-duplicate-123" }],
+        },
+        { status: 409 },
+      );
+    }
+    return null;
+  }
+
+  // Plan execution scenarios (POST /plans/:id/execute)
+  if (endpointKind === "execute") {
+    if (scenario === "unknown-outcome") {
+      return HttpResponse.json(operationUnknownOutcome, { status: 202 });
+    }
+    if (scenario === "stale") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "PLAN_STALE",
+          message: "The state changed since this preview was generated.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000041",
+          next_steps: ["Regenerate the preview before applying this change."],
+        },
+        { status: 409 },
+      );
+    }
+    if (scenario === "expired") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "PLAN_EXPIRED",
+          message: "This preview has expired.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000042",
+          next_steps: ["Regenerate the preview before applying this change."],
+        },
+        { status: 409 },
+      );
+    }
+    if (scenario === "invalidated") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "PLAN_INVALIDATED",
+          message: "This preview has been invalidated.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000043",
+          next_steps: ["Regenerate the preview."],
+        },
+        { status: 409 },
+      );
+    }
+    if (scenario === "duplicate") {
+      return HttpResponse.json(
+        {
+          success: false,
+          code: "DUPLICATE_SUBMISSION",
+          message: "An operation already exists for this preview.",
+          correlation_id: "c0ffee00-0000-4000-8000-000000000044",
+          next_steps: ["Open the existing operation instead of submitting again."],
+          errors: [{ field: "operation_id", code: "DUPLICATE", message: "op-duplicate-123" }],
+        },
+        { status: 409 },
+      );
+    }
+    return null;
+  }
+
+  // Operation lifecycle scenarios (GET /operations/:id, POST /operations/:id/reconcile)
+  if (endpointKind === "operation") {
+    return null;
+  }
+
   return null;
 }
 
@@ -681,7 +755,7 @@ export const handlers = [
   http.get("*/api/v1/context", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     return HttpResponse.json(contextFixture);
@@ -690,7 +764,7 @@ export const handlers = [
   http.get("*/api/v1/me", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     return HttpResponse.json(identityFixture);
@@ -699,7 +773,7 @@ export const handlers = [
   http.get("*/api/v1/capabilities", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     return HttpResponse.json(capabilitiesFixture);
@@ -708,7 +782,7 @@ export const handlers = [
   http.get("*/api/v1/catalogs", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     if (scenario === "empty") {
@@ -736,7 +810,7 @@ export const handlers = [
   http.get("*/api/v1/catalogs/:catalog/schemas", async ({ request, params }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     if (scenario === "empty") {
@@ -768,7 +842,7 @@ export const handlers = [
   http.get("*/api/v1/schemas/:catalog/:schema/objects", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     if (scenario === "empty") {
@@ -807,7 +881,7 @@ export const handlers = [
   http.get("*/api/v1/assets/:securable_type/:full_name/dependencies", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     if (scenario === "empty") {
@@ -826,7 +900,7 @@ export const handlers = [
   http.get("*/api/v1/assets/:securable_type/:full_name/grants", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     if (scenario === "empty") {
@@ -869,7 +943,7 @@ export const handlers = [
   http.get("*/api/v1/privileges", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     return HttpResponse.json({
@@ -923,7 +997,7 @@ export const handlers = [
   http.get("*/api/v1/assets/:securable_type/:full_name", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "read");
     if (scenarioRes) return scenarioRes;
 
     if (scenario === "unknown-enum") {
@@ -944,7 +1018,7 @@ export const handlers = [
   http.post("*/api/v1/plans", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "plan");
     if (scenarioRes) return scenarioRes;
 
     let body: Partial<PlanCreateRequest> = {};
@@ -986,7 +1060,7 @@ export const handlers = [
   http.get("*/api/v1/plans/:plan_id", async ({ request, params }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "plan");
     if (scenarioRes) return scenarioRes;
 
     return HttpResponse.json({
@@ -1001,7 +1075,7 @@ export const handlers = [
   http.post("*/api/v1/plans/:plan_id/execute", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "execute");
     if (scenarioRes) return scenarioRes;
 
     if (scenario === "unknown-outcome") {
@@ -1023,7 +1097,7 @@ export const handlers = [
   http.get("*/api/v1/operations/:operation_id", async ({ request, params }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "operation");
     if (scenarioRes) return scenarioRes;
 
     if (params.operation_id === "op-duplicate-123" || scenario === "duplicate") {
@@ -1039,7 +1113,7 @@ export const handlers = [
   http.post("*/api/v1/operations/:operation_id/reconcile", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
-    const scenarioRes = await handleScenario(scenario);
+    const scenarioRes = await handleScenario(scenario, "operation");
     if (scenarioRes) return scenarioRes;
 
     return HttpResponse.json({

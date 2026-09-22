@@ -1,44 +1,6 @@
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import path from "node:path";
-import fs from "node:fs";
 import { strings } from "@/lib/strings";
-
-const cwd = process.cwd();
-const SCREENSHOTS_DIR = cwd.endsWith("frontend")
-  ? path.resolve(cwd, "../screenshots")
-  : path.resolve(cwd, "screenshots");
-
-async function captureScreenshots(page: any, screenName: string) {
-  fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, `synthetic-${screenName}-1440.png`),
-  });
-
-  await page.setViewportSize({ width: 375, height: 667 });
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, `synthetic-${screenName}-375.png`),
-  });
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-}
-
-async function runA11yScan(page: any, contextName: string) {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-
-  const seriousOrCritical = results.violations.filter(
-    (v) => v.impact === "critical" || v.impact === "serious"
-  );
-
-  expect(
-    seriousOrCritical,
-    `Accessibility violations (${seriousOrCritical.length}) in ${contextName}: ${JSON.stringify(seriousOrCritical, null, 2)}`
-  ).toEqual([]);
-}
+import { captureScreenshots, runA11yScan } from "./helpers";
 
 test("Journey 2: revoking an inherited grant sends user to source @a11y", async ({ page }) => {
   // Pin clock into the frozen fixture window

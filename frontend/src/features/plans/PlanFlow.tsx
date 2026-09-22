@@ -85,6 +85,12 @@ export function PlanFlow({
 }: PlanFlowProps) {
   const titleId = useId();
   const outcomeTitleId = useId();
+  const principalInputId = useId();
+  const privilegeSelectId = useId();
+  const newOwnerInputId = useId();
+  const commentInputId = useId();
+  const reasonInputId = useId();
+  const typedConfirmInputId = useId();
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
@@ -476,10 +482,14 @@ export function PlanFlow({
             {/* Principal input (for grant & revoke) */}
             {(kind === "grant" || kind === "revoke") && (
               <div className="space-y-1">
-                <label className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor={principalInputId}
+                  className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                >
                   {strings.planFlow.form.principal}
                 </label>
                 <input
+                  id={principalInputId}
                   type="text"
                   disabled={isFormPending || isExecuting}
                   {...register("principal", { required: true })}
@@ -492,10 +502,15 @@ export function PlanFlow({
             {/* Privilege input (for grant & revoke) */}
             {(kind === "grant" || kind === "revoke") && (
               <div className="space-y-1">
-                <label className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor={privilegeSelectId}
+                  className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                >
                   {strings.planFlow.form.privilege}
                 </label>
                 <select
+                  id={privilegeSelectId}
+                  aria-label={strings.planFlow.form.privilege}
                   disabled={isFormPending || isExecuting}
                   {...register("privilege")}
                   className="w-full px-3 py-2 text-[var(--text-sm)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
@@ -514,10 +529,14 @@ export function PlanFlow({
             {/* New owner input (for transfer_ownership) */}
             {kind === "transfer_ownership" && (
               <div className="space-y-1">
-                <label className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor={newOwnerInputId}
+                  className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                >
                   {strings.planFlow.form.newOwner}
                 </label>
                 <input
+                  id={newOwnerInputId}
                   type="text"
                   disabled={isFormPending || isExecuting}
                   {...register("new_owner", { required: true })}
@@ -530,10 +549,14 @@ export function PlanFlow({
             {/* Comment input (for edit_metadata) */}
             {kind === "edit_metadata" && (
               <div className="space-y-1">
-                <label className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+                <label
+                  htmlFor={commentInputId}
+                  className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                >
                   {strings.planFlow.form.comment}
                 </label>
                 <textarea
+                  id={commentInputId}
                   rows={3}
                   disabled={isFormPending || isExecuting}
                   {...register("comment")}
@@ -545,10 +568,14 @@ export function PlanFlow({
 
             {/* Reason input (Mandatory for ALL mutations) */}
             <div className="space-y-1">
-              <label className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+              <label
+                htmlFor={reasonInputId}
+                className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+              >
                 {strings.planFlow.form.reason}
               </label>
               <textarea
+                id={reasonInputId}
                 rows={2}
                 disabled={isFormPending || isExecuting}
                 {...register("reason", { required: true, minLength: 3, maxLength: 200 })}
@@ -806,13 +833,17 @@ export function PlanFlow({
             <div className="pt-3 border-t border-[var(--color-border-subtle)] space-y-3">
               {plan.requires_typed_confirmation && (
                 <div className="space-y-1.5 p-3 bg-[var(--color-warning-bg)] border border-[var(--color-warning)]/30 rounded-[var(--radius-control)]">
-                  <label className="block text-[var(--text-xs)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+                  <label
+                    htmlFor={typedConfirmInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]"
+                  >
                     {strings.planFlow.confirm.typedPrompt.replace(
                       "{value}",
                       plan.typed_confirmation_value || "",
                     )}
                   </label>
                   <input
+                    id={typedConfirmInputId}
                     type="text"
                     value={typedConfirmationValue}
                     onChange={(e) => setTypedConfirmationValue(e.target.value)}

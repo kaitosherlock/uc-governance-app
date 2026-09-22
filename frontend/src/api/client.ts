@@ -24,13 +24,30 @@ export interface RequestOptions {
 }
 
 /**
+ * Resolves the ?scenario= search parameter from the current page URL in development only.
+ * In a production build, import.meta.env.DEV is false and this returns undefined.
+ */
+export function getActiveDevScenario(isDev: boolean = import.meta.env.DEV): string | undefined {
+  if (!isDev) {
+    return undefined;
+  }
+  if (typeof window !== "undefined" && window.location?.search) {
+    const scenario = new URLSearchParams(window.location.search).get("scenario");
+    return scenario || undefined;
+  }
+  return undefined;
+}
+
+/**
  * Builds the full URL including /api/v1 prefix, resolved path parameters, and query string.
  * Path parameters like {full_name} are URL-encoded as a single segment.
+ * In development only, ?scenario= from the current page URL is automatically forwarded.
  */
 export function buildUrl(
   pathTemplate: string,
   params?: Record<string, string> | undefined,
   query?: Record<string, string | number | boolean | undefined> | undefined,
+  isDev: boolean = import.meta.env.DEV,
 ): string {
   // Replace path parameters like {full_name}, {catalog}, etc.
   let resolved = pathTemplate.replace(/\{([^}]+)\}/g, (_, key: string) => {
@@ -51,18 +68,26 @@ export function buildUrl(
     ? resolved
     : `${API_PREFIX}${resolved}`;
 
+  const searchParams = new URLSearchParams();
+
+  // In development only, propagate ?scenario= from the current page URL if not already explicitly specified
+  const devScenario = getActiveDevScenario(isDev);
+  if (devScenario && query?.["scenario"] === undefined) {
+    searchParams.set("scenario", devScenario);
+  }
+
   // Append query string if present
   if (query) {
-    const searchParams = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined && v !== null) {
         searchParams.set(k, String(v));
       }
     }
-    const qs = searchParams.toString();
-    if (qs) {
-      return `${fullPath}?${qs}`;
-    }
+  }
+
+  const qs = searchParams.toString();
+  if (qs) {
+    return `${fullPath}?${qs}`;
   }
 
   return fullPath;

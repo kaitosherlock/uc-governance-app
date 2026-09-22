@@ -1,45 +1,6 @@
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import path from "node:path";
-import fs from "node:fs";
 import { strings } from "@/lib/strings";
-import operationUnknownOutcome from "../../shared/contracts/examples/OperationResponse.unknown-outcome.json" with { type: "json" };
-
-const cwd = process.cwd();
-const SCREENSHOTS_DIR = cwd.endsWith("frontend")
-  ? path.resolve(cwd, "../screenshots")
-  : path.resolve(cwd, "screenshots");
-
-async function captureScreenshots(page: any, screenName: string) {
-  fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, `synthetic-${screenName}-1440.png`),
-  });
-
-  await page.setViewportSize({ width: 375, height: 667 });
-  await page.screenshot({
-    path: path.join(SCREENSHOTS_DIR, `synthetic-${screenName}-375.png`),
-  });
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-}
-
-async function runA11yScan(page: any, contextName: string) {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-
-  const seriousOrCritical = results.violations.filter(
-    (v) => v.impact === "critical" || v.impact === "serious"
-  );
-
-  expect(
-    seriousOrCritical,
-    `Accessibility violations (${seriousOrCritical.length}) in ${contextName}: ${JSON.stringify(seriousOrCritical, null, 2)}`
-  ).toEqual([]);
-}
+import { captureScreenshots, runA11yScan } from "./helpers";
 
 test("Journey 3: unknown outcome is reconciled, not retried @a11y", async ({ page }) => {
   // Pin clock into the frozen fixture window
@@ -47,19 +8,14 @@ test("Journey 3: unknown outcome is reconciled, not retried @a11y", async ({ pag
 
   // Count execution requests to verify mutation is never automatically retried
   let executeRequestCount = 0;
-
-  // Intercept the plan execution call and drive HTTP 202 with Operation.status === "unknown"
-  await page.route("**/api/v1/plans/*/execute*", async (route) => {
-    executeRequestCount++;
-    await route.fulfill({
-      status: 202,
-      contentType: "application/json",
-      body: JSON.stringify(operationUnknownOutcome),
-    });
+  page.on("request", (req) => {
+    if (req.url().includes("/plans/") && req.url().includes("/execute")) {
+      executeRequestCount++;
+    }
   });
 
-  // 1. Navigate to orders access tab
-  await page.goto("/assets/sales/crm/TABLE/orders?tab=access");
+  // 1. Navigate to orders access tab with scenario=unknown-outcome
+  await page.goto("/assets/sales/crm/TABLE/orders?tab=access&scenario=unknown-outcome");
   await expect(page.getByRole("heading", { level: 1, name: "orders" })).toBeVisible();
 
   const grantsTable = page.getByRole("table", { name: strings.access.grantsTable.title });
@@ -96,8 +52,10 @@ test("Journey 3: unknown outcome is reconciled, not retried @a11y", async ({ pag
   });
   await expect(outcomeHeading).toBeVisible();
 
-  const unknownTitle = dialog.getByText(strings.planFlow.outcome.unknownTitle);
-  await expect(unknownTitle).toBeVisible();
+  const unknownHeading = dialog.getByRole("heading", {
+    name: strings.planFlow.outcome.unknownTitle,
+  });
+  await expect(unknownHeading).toBeVisible();
 
   const unknownSummary = dialog.getByText(strings.planFlow.outcome.unknownSummary);
   await expect(unknownSummary).toBeVisible();
@@ -124,14 +82,16 @@ test("Journey 3: unknown outcome is reconciled, not retried @a11y", async ({ pag
   await checkStateBtn.click();
 
   // 9. Assert the reconciled status replaces the unknown state
-  const appliedTitle = dialog.getByText(strings.planFlow.outcome.appliedTitle);
-  await expect(appliedTitle).toBeVisible();
+  const appliedHeading = dialog.getByRole("heading", {
+    name: strings.planFlow.outcome.appliedTitle,
+  });
+  await expect(appliedHeading).toBeVisible();
 
   // Reconciled summary text
   await expect(dialog.getByText(/Operation reconciled/)).toBeVisible();
 
   // Unknown state elements are no longer present
-  await expect(dialog.getByText(strings.planFlow.outcome.unknownTitle)).toHaveCount(0);
+  await expect(dialog.getByRole("heading", { name: strings.planFlow.outcome.unknownTitle })).toHaveCount(0);
   await expect(checkStateBtn).toHaveCount(0);
 
   // 10. Assert the mutation was never retried automatically
