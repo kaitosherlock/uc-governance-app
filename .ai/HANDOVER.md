@@ -1,8 +1,8 @@
 # ORCHESTRATION HANDOVER STATE
 
-- **Timestamp**: 2026-09-22T05:25:00Z
+- **Timestamp**: 2026-09-22T06:55:00Z
 - **Current Phase**: Phase 0 — Foundations. P0-02, P0-03 and P0-04 complete and verified. The application runs.
-- **Active Task**: none in flight. The frontend lane is out of quota with one queued fix; see below.
+- **Active Task**: none. Both lanes are out of quota. Two tasks sit in the resume queue with their sessions intact.
 - **Deployed**: https://uc-governance-7474654536971820.aws.databricksapps.com (workspace dbc-76001947-638a, mode connected_readonly, RUNNING).
 - **Published**: https://github.com/kaitosherlock/uc-governance-app (public).
 
@@ -74,10 +74,27 @@
 
 Nothing in flight. No blocker to the next dispatch.
 
-**Queued on the frontend lane.** The section description renders twice. The fix was dispatched, the
-agent added the `strings.unavailable` group, then hit a real quota limit before wiring `routes.tsx`.
-Status `quota_exhausted`, session `0258ed5e`, resets around 05:00 UTC on 2026-09-22. Resume with
-`./scripts/resume.ps1 -Agent frontend`. Do not hand-patch it.
+**Resume queue, both lanes out of quota.**
+
+| Task | Lane | Session | State |
+|---|---|---|---|
+| `P1-READ` | backend, codex | `01a0c746` | 22 modules landed and 308 tests pass, but 227 ruff and 4 mypy errors remain because it stopped before tidying |
+| `P0-05` | frontend, agy | `9659217c` | one file written, parked out of the build; resets about 4h22m from 06:45 UTC |
+
+Resume with `./scripts/resume.ps1` for both, or `-Agent backend` / `-Agent frontend` for one.
+Use `.ai/prompts/P0-05-resume.md` for the frontend, which orders the writes so the tree is never
+broken partway and tells the agent to stop on a step boundary.
+
+**Checkpoint is green.** Gate 1 passes 15 checks, 308 backend tests pass, and frontend tsc, eslint
+and vite build are all clean. The parked partial file is at
+`.ai/state/partial/P0-05.errors.ts.partial`; nothing was lost.
+
+**A detector bug in my own harness was found and fixed.** agy exited 0 while its JSON said
+`"status":"ERROR"` with a quota message, so the non-zero-exit rule produced a false negative and the
+interrupted task was recorded as completed. Unfinished work would have been dropped silently rather
+than resumed. `Test-QuotaExhausted` now also treats an explicit failure status in the agent's
+structured output as a failed run. Five cases are covered, including the guard that a successful run
+mentioning rate limits or 429 is still a success.
 
 **Deployment facts.** The Azure workspace `adb-7405611500888142` is banned from Databricks Apps at
 the platform level and cannot host this app. The AWS workspace `dbc-76001947-638a` works and is

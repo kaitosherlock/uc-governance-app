@@ -235,9 +235,19 @@ function Test-QuotaExhausted {
     # Returns the matched pattern (truthy) or $null. A run that exited 0 delivered its work, so a
     # quota-looking word in successful output is a false positive: this project's own code and
     # tests legitimately mention rate limits and HTTP 429.
+    #
+    # Exception, learned the hard way on 2026-09-22: agy can report a quota failure in its JSON
+    # result while still exiting 0. That produced a false negative, the task was recorded as
+    # completed, and the unfinished work would have been silently dropped instead of resumed. So an
+    # explicit failure status in the agent's own structured output counts as a failed run even when
+    # the process exit code says otherwise.
     param([string]$Text, $Config, [int]$ExitCode = 1)
     if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
-    if ($Config.quota_detection.require_nonzero_exit -and $ExitCode -eq 0) { return $null }
+    $declaresFailure = ($Text -match '"status"\s*:\s*"(ERROR|RESOURCE_EXHAUSTED|FAILED)"') -or
+                       ($Text -match 'AGY_ERROR')
+    if ($Config.quota_detection.require_nonzero_exit -and $ExitCode -eq 0 -and -not $declaresFailure) {
+        return $null
+    }
     foreach ($pattern in $Config.quota_detection.patterns) {
         if ($Text -imatch $pattern) { return $pattern }
     }
