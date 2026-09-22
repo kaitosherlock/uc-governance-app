@@ -77,7 +77,7 @@ if ($spec.quota.state -eq 'exhausted') {
         -Prompt 'Reply with the single word READY. Do not read or modify any file.' `
         -LogFile $probeLog -Header "quota probe for $Agent" -TimeoutMinutes 5
 
-    if (Test-QuotaExhausted -Text $probe.Output -Config $config -ExitCode $probe.ExitCode) {
+    if (Test-QuotaExhausted -Text $probe.Output -Config $config -ExitCode $probe.ExitCode -Cli $spec.cli) {
         Write-Host "DEFERRED: '$Agent' is still out of quota on '$probeModel'." -ForegroundColor Yellow
         Set-AgentQuotaState -Root $root -Config $config -Agent $Agent -State 'exhausted'
         exit 75
@@ -175,7 +175,7 @@ $result = Invoke-AgentRun -Invocation $invocation -Prompt $Prompt -LogFile $path
     -TimeoutMinutes $TimeoutMinutes
 
 $sessionId = Get-SessionId -Text $result.Output
-$quotaPattern = Test-QuotaExhausted -Text $result.Output -Config $config -ExitCode $result.ExitCode
+$quotaPattern = Test-QuotaExhausted -Text $result.Output -Config $config -ExitCode $result.ExitCode -Cli $spec.cli
 
 Complete-Run -Root $root -Config $config -Agent $Agent -RecordPath $paths.Record `
     -Result $result -SessionId $sessionId -QuotaPattern $quotaPattern -TaskId $TaskId

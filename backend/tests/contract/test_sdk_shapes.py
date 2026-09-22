@@ -267,7 +267,9 @@ DTO_FIELDS = {
         ),
     },
     ("groups", "get"): {"databricks.sdk.service.iam.Group": ("id", "members", "display_name")},
-    ("current_user", "me"): {"databricks.sdk.service.iam.User": ("id", "user_name", "groups")},
+    ("current_user", "me"): {
+        "databricks.sdk.service.iam.User": ("id", "user_name", "groups", "external_id")
+    },
     ("serving_endpoints", "get"): {
         "databricks.sdk.service.serving.ServingEndpointDetailed": ("name", "ai_gateway"),
     },

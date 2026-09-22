@@ -71,22 +71,8 @@ def test_connected_resolver_is_lazy_and_user_scoped(monkeypatch: pytest.MonkeyPa
     assert response.json()["code"] == "UNAUTHENTICATED"
 
 
-@pytest.mark.parametrize(
-    ("headers", "expected"),
-    [
-        ({"X-Forwarded-Email": "alice@example.test"}, 200),
-        ({"X-Forwarded-Email": "spoof@example.test"}, 401),
-        ({"X-Forwarded-User": "wrong-user-id"}, 401),
-    ],
-)
-def test_forwarded_headers_cross_checked(
-    monkeypatch: pytest.MonkeyPatch,
-    headers: dict[str, str],
-    expected: int,
-) -> None:
-    app = connected_app(monkeypatch)
-    resolver = AsyncMock()
-    resolver.resolve.return_value = ResolvedUser(
+def verified_user(external_id: str | None = None) -> ResolvedUser:
+    return ResolvedUser(
         actor=Actor(
             id="synthetic-user-id",
             display="Alice",
@@ -95,7 +81,18 @@ def test_forwarded_headers_cross_checked(
             verified_by="user_token",
         ),
         email="alice@example.test",
+        external_id=external_id,
     )
+
+
+def request_with_forwarded_headers(
+    monkeypatch: pytest.MonkeyPatch,
+    headers: dict[str, str],
+    external_id: str | None = None,
+) -> tuple[int, str | None]:
+    app = connected_app(monkeypatch)
+    resolver = AsyncMock()
+    resolver.resolve.return_value = verified_user(external_id)
     app.state.identity_resolver = resolver
     with TestClient(app) as client:
         response = client.get(
@@ -105,9 +102,55 @@ def test_forwarded_headers_cross_checked(
                 **headers,
             },
         )
-    assert response.status_code == expected
-    if expected == 401:
-        assert response.json()["code"] == "IDENTITY_MISMATCH"
+    return response.status_code, response.json().get("code")
+
+
+def test_matching_forwarded_email_resolves_successfully(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert request_with_forwarded_headers(
+        monkeypatch, {"X-Forwarded-Email": "alice@example.test"}
+    ) == (200, None)
+
+
+def test_contradicting_forwarded_email_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert request_with_forwarded_headers(
+        monkeypatch, {"X-Forwarded-Email": "spoof@example.test"}
+    ) == (401, "IDENTITY_MISMATCH")
+
+
+def test_forwarded_user_rejects_non_matching_external_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert request_with_forwarded_headers(
+        monkeypatch,
+        {"X-Forwarded-User": "different-idp-user"},
+        external_id="idp-user",
+    ) == (401, "IDENTITY_MISMATCH")
+
+
+def test_forwarded_user_without_external_id_is_not_compared(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert request_with_forwarded_headers(
+        monkeypatch, {"X-Forwarded-User": "idp-user"}
+    ) == (200, None)
+
+
+def test_forwarded_email_and_preferred_username_are_casefolded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert request_with_forwarded_headers(
+        monkeypatch,
+        {
+            "X-Forwarded-Email": "ALICE@EXAMPLE.TEST",
+            "X-Forwarded-Preferred-Username": "ALICE@EXAMPLE.TEST",
+        },
+    ) == (200, None)
+
+
+def test_contradicting_preferred_username_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert request_with_forwarded_headers(
+        monkeypatch, {"X-Forwarded-Preferred-Username": "spoof@example.test"}
+    ) == (401, "IDENTITY_MISMATCH")
 
 
 def test_fixture_identity_rejected_in_connected_mode(monkeypatch: pytest.MonkeyPatch) -> None:

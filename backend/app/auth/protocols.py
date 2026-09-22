@@ -10,6 +10,7 @@ from app.api.v1.models import Actor
 class ResolvedUser:
     actor: Actor
     email: str | None
+    external_id: str | None = None
 
 
 class UserIdentityResolver(Protocol):

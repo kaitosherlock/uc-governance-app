@@ -237,24 +237,53 @@ $Prompt
 }
 
 function Test-QuotaExhausted {
-    # Returns the matched pattern (truthy) or $null. A run that exited 0 delivered its work, so a
-    # quota-looking word in successful output is a false positive: this project's own code and
-    # tests legitimately mention rate limits and HTTP 429.
+    # Returns the matched pattern (truthy) or $null.
     #
-    # Exception, learned the hard way on 2026-09-22: agy can report a quota failure in its JSON
-    # result while still exiting 0. That produced a false negative, the task was recorded as
-    # completed, and the unfinished work would have been silently dropped instead of resumed. So an
-    # explicit failure status in the agent's own structured output counts as a failed run even when
-    # the process exit code says otherwise.
-    param([string]$Text, $Config, [int]$ExitCode = 1)
+    # Three things had to be learned the hard way, all on 2026-09-22, and all of them are load
+    # bearing. Do not simplify this function without re-reading them.
+    #
+    # 1. A run that exited 0 delivered its work, so a quota-looking word in successful output is a
+    #    false positive. This project implements a RATE_LIMITED error code and tests HTTP 429, so
+    #    its own source legitimately contains the vocabulary.
+    #
+    # 2. agy can report a quota failure in its JSON result while still exiting 0. Trusting the exit
+    #    code alone produced a FALSE NEGATIVE: the task was recorded as completed and the unfinished
+    #    work would have been silently dropped instead of resumed. So an explicit failure status in
+    #    the agent's own structured output overrides exit 0.
+    #
+    # 3. But those structured markers are agy's, and applying them to every lane produced a FALSE
+    #    POSITIVE: a codex run read tasks/STATUS.md, whose log entries describe earlier quota
+    #    events and mention AGY_ERROR, the marker matched somewhere in the middle of the
+    #    transcript, the exit-0 guard was bypassed, and a completed task on a healthy lane was
+    #    parked as deferred. The markers are therefore scoped to the lane that emits them, and the
+    #    pattern scan is limited to the TAIL of the output, because a real exhaustion aborts the
+    #    run and says so at the end, while a file the agent merely read appears in the middle.
+    param(
+        [string]$Text,
+        $Config,
+        [int]$ExitCode = 1,
+        # The lane's CLI, e.g. 'agy' or 'codex'. Structured failure markers are only honoured for
+        # the CLI that actually emits them.
+        [string]$Cli = ''
+    )
     if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
-    $declaresFailure = ($Text -match '"status"\s*:\s*"(ERROR|RESOURCE_EXHAUSTED|FAILED)"') -or
-                       ($Text -match 'AGY_ERROR')
+
+    $declaresFailure = $false
+    if ($Cli -eq 'agy') {
+        $declaresFailure = ($Text -match '"status"\s*:\s*"(ERROR|RESOURCE_EXHAUSTED|FAILED)"') -or
+                           ($Text -match 'AGY_ERROR')
+    }
     if ($Config.quota_detection.require_nonzero_exit -and $ExitCode -eq 0 -and -not $declaresFailure) {
         return $null
     }
+
+    # Only the tail. An aborted run's reason is the last thing printed; project files the agent read
+    # are not.
+    $tailChars = 4000
+    $tail = if ($Text.Length -gt $tailChars) { $Text.Substring($Text.Length - $tailChars) } else { $Text }
+
     foreach ($pattern in $Config.quota_detection.patterns) {
-        if ($Text -imatch $pattern) { return $pattern }
+        if ($tail -imatch $pattern) { return $pattern }
     }
     return $null
 }

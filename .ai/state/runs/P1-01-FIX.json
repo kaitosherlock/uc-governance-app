@@ -1,0 +1,24 @@
+{
+    "log": "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T085336Z-backend-P1-01-FIX.log",
+    "tier": "tier_reasoning",
+    "agent": "backend",
+    "session_id": "01a0c852-130e-72f2-9a98-aae2f1df2400",
+    "finished_at": "2026-09-22T09:03:50.4867861Z",
+    "seconds": 614,
+    "prompt_chars": 4837,
+    "started_at": "2026-09-22T08:53:36.6168163Z",
+    "model": "gpt-5.6-terra",
+    "last_message_excerpt": "Fixed connected-mode identity matching.\n\n- `X-Forwarded-User` now compares only to populated SCIM `external_id`, never SCIM `id`; absent external ID is accepted.\n- Email and preferred username are casefolded against the token-verified username.\n- Mismatches still return `IDENTITY_MISMATCH` and log no identity values.\n- Added the minimal `ResolvedUser.external_id` field and SDK shape assertion.\n\nVerified: Ruff clean, Mypy clean (55 files), focused identity + SDK tests: 181 passed.\n\nFull `backend/tests` collection remains sandbox-blocked by denied read access to `jsonschema_specifications/.../metaschema.json`.",
+    "history": [
+        "2026-09-22T08:53:36.6365472Z dispatched",
+        "2026-09-22T09:03:50.5081429Z quota_exhausted",
+        "2026-09-22T09:14:21.603731Z completed (corrected: detector false positive)"
+    ],
+    "task_id": "P1-01-FIX",
+    "status": "completed",
+    "effort": "high",
+    "exit_code": 0,
+    "attempt": 1,
+    "prompt_file": ".ai/prompts/P1-01-FIX.md",
+    "correction_note": "Recorded as quota_exhausted by a detector bug in the orchestrator's own code. The run exited 0 and delivered its work; the agent had read tasks/STATUS.md, whose entries describe earlier quota events and mention AGY_ERROR, and that agy-specific marker matched in the middle of a CODEX transcript, bypassing the exit-0 guard. Test-QuotaExhausted now scopes structured failure markers to the CLI that emits them and scans only the tail of the output. Verified against five real logs."
+}

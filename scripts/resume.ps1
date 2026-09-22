@@ -91,7 +91,7 @@ foreach ($lane in $lanes) {
         -LogFile (Join-Path (Join-Path $root $config.dispatch_rules.log_dir) ("probe-$lane-" + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ') + '.log')) `
         -Header "quota probe for $lane" -TimeoutMinutes 5
 
-    if (Test-QuotaExhausted -Text $probe.Output -Config $config -ExitCode $probe.ExitCode) {
+    if (Test-QuotaExhausted -Text $probe.Output -Config $config -ExitCode $probe.ExitCode -Cli $spec.cli) {
         Write-Host "  still out of quota. Nothing resumed for '$lane'." -ForegroundColor Yellow
         Set-AgentQuotaState -Root $root -Config $config -Agent $lane -State 'exhausted'
         $available[$lane] = $false
@@ -177,7 +177,7 @@ The API contract in shared/contracts/ is unchanged and remains immutable.
 
     $sid = Get-SessionId -Text $result.Output
     if (-not $sid) { $sid = $rec.session_id }
-    $quotaPattern = Test-QuotaExhausted -Text $result.Output -Config $config -ExitCode $result.ExitCode
+    $quotaPattern = Test-QuotaExhausted -Text $result.Output -Config $config -ExitCode $result.ExitCode -Cli $spec.cli
 
     Complete-Run -Root $root -Config $config -Agent $rec.agent -RecordPath $p.Path `
         -Result $result -SessionId $sid -QuotaPattern $quotaPattern -TaskId $rec.task_id

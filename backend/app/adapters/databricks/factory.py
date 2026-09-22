@@ -107,6 +107,7 @@ class SDKIdentityResolver:
                 verified_by="user_token",
             ),
             email=user.user_name,
+            external_id=user.external_id,
         )
 
 
