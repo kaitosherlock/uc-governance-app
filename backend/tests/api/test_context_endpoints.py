@@ -41,6 +41,15 @@ def test_context_configuration_and_identity(client: TestClient) -> None:
     assert actor["verified_by"] == "fixture"
 
 
+def test_capabilities_reports_classification_results_unsupported(client: TestClient) -> None:
+    capabilities = client.get("/api/v1/capabilities").json()["data"]
+    classification = next(row for row in capabilities if row["capability"] == "classification.read")
+
+    assert classification["status"] == "unsupported_in_environment"
+    assert "0.140.0" in classification["reason"]
+    assert "results" in classification["reason"]
+
+
 def test_generated_request_id_is_uuid4(client: TestClient) -> None:
     response = client.get("/api/v1/context")
     request_id = response.json()["meta"]["correlation_id"]

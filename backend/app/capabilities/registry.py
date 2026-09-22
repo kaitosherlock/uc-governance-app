@@ -38,7 +38,15 @@ REGISTRY = (
     Declaration("tags.update", "7.3", status=AVAILABLE),
     Declaration("tag_policies.read", "7.3", status=AVAILABLE),
     Declaration("tag_policies.update", "7.3"),
-    Declaration("classification.read", "7.3"),
+    Declaration(
+        "classification.read",
+        "7.3",
+        status=CapabilityStatusValue.UNSUPPORTED_IN_ENVIRONMENT,
+        reason=(
+            "databricks-sdk 0.140.0 exposes catalog configuration only; it has no "
+            "classification scan-status or column/table-results read surface."
+        ),
+    ),
     Declaration("abac_policies.read", "7.4", status=AVAILABLE),
     Declaration("abac_policies.update", "7.4", status=AVAILABLE),
     Declaration("filters.read", "7.5", status=AVAILABLE),

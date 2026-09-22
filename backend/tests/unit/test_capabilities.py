@@ -45,3 +45,14 @@ def test_missing_warehouse_downgrades_without_enabling_other_features(
     with pytest.raises(NotImplementedYet) as exc:
         require_available("lineage.read", Settings())
     assert exc.value.http_status == 501
+
+
+def test_classification_results_are_reported_unsupported_with_evidence() -> None:
+    classification = next(row for row in REGISTRY if row.capability == "classification.read")
+
+    reported = probe(classification, Settings())
+
+    assert reported.status == Status.UNSUPPORTED_IN_ENVIRONMENT
+    assert reported.reason is not None
+    assert "0.140.0" in reported.reason
+    assert "results" in reported.reason
