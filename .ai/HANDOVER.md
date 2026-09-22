@@ -1,10 +1,11 @@
 # ORCHESTRATION HANDOVER STATE
 
-- **Timestamp**: 2026-09-22T15:05:00+07:00
-- **Current Phase**: Phase 1 read path COMPLETE and Gate 2 verified. P0-02, P0-03, P0-04, P0-06, P0-08, P1-01, P1-02, P1-03 all done. P0-05 is the only task in flight.
-- **Active Task**: P0-05 frontend, in_progress with UNVERIFIED edits in the working tree, uncommitted. Backend lane out of quota again after landing its work.
-- **Deployed**: https://uc-governance-7474654536971820.aws.databricksapps.com (workspace dbc-76001947-638a, mode connected_readonly, RUNNING).
-- **Published**: https://github.com/kaitosherlock/uc-governance-app (public).
+- **Timestamp**: 2026-09-22T15:15:00+07:00
+- **Current Phase**: Phase 1 — the read spine is complete and verified. Eight read endpoints, the typed API client, the query layer and the MSW mocks all land and pass their gates. The mutation core is in flight.
+- **Active Task**: P1-04, mutation core, backend lane, codex at `tier_reasoning`.
+- **Deployed**: https://uc-governance-7474654536971820.aws.databricksapps.com (workspace dbc-76001947-638a, mode connected_readonly, RUNNING, redeployed 2026-09-22 15:02 with the Phase 1 read spine).
+- **Published**: https://github.com/kaitosherlock/uc-governance-app (public, `main`).
+- **Gates**: all eight pass. `./scripts/check_all.sh` reports `All 8 checks passed`.
 
 ## 1. COMPLETED MILESTONES
 
@@ -72,100 +73,86 @@
 
 ## 2. IN-PROGRESS / CURRENT BLOCKER
 
-### The one thing to do first on resume
+**In flight:** `P1-04`, the mutation core, on the backend lane. It is the single highest-value task
+left: P1-05, P2-01, P2-03, P2-04, every P3 task, P4-04 and P5-02 all depend on it. Prompt at
+`.ai/prompts/P1-04.md`.
 
-`P0-05` has rejection-round-2 edits sitting UNCOMMITTED and UNVERIFIED in `frontend/`. Run Gate 3
-before anything else, then commit if green:
+**Resume queue: empty.** `P1-READ` and `P0-05` were both finished by their agents and verified by
+the orchestrator, so their run records were moved from `quota_exhausted` to `completed`. Nothing is
+waiting to be continued.
 
-```
-cd frontend
-npx tsc --noEmit
-npx eslint .
-npx vitest run
-npx vite build
-```
+**Quota:** the backend lane is OK, confirmed by a live probe at 08:02Z that returned a real answer.
+The frontend lane is exhausted; agy reported "Resets in 4h22m" at 07:52Z, so roughly **12:14Z,
+19:14 local**. Probe before use; `scripts/resume.ps1` does that automatically and costs nothing when
+the lane is still dry.
 
-Last measured state, after rejection round 1: `tsc` exit 0, `eslint` exit 0, vitest **37 of 38**.
-The single failure was `TestingLibraryElementError: Found multiple elements with the text:
-alice.steward@example.com` at `ContextBar.test.tsx:78`, because the outer span and the inner span
-both normalise to the same text. Round 2 fixed that at the source rather than papering over it: the
-actor and executor spans now carry `aria-label`s (7 in the file, up from 5) with the strings in
-`strings.ts`, and the test queries by `getByLabelText`. That also closed a genuine accessibility
-gap — a screen reader previously read two bare principal names with no way to tell the person from
-the service principal. **Verify it; do not assume it.**
+### Open defect, found by live verification and not yet fixed
 
-If Gate 3 is green, commit `frontend/` and `tasks/`, mark P0-05 done, and push.
-If it is not, write the next rejection to `.ai/prompts/P0-05-gate3-reject3.md` and dispatch with
-`-Tier tier_utility -Continue`.
+**Connected mode rejects every real user with `IDENTITY_MISMATCH`.** `backend/app/auth/actor.py`
+compares `X-Forwarded-User` against `current_user.me().id`. Those are different identifier spaces:
+`docs/04-databricks-apps-constraints.md` line 64 records that the header carries the **IdP** user
+identifier, while the SCIM id is the **Databricks** user id, so the comparison can essentially never
+succeed. Evidence: in a browser session the platform had already authenticated, the SPA shell loaded
+but `GET /api/v1/context` returned 401 with that code. The email cross-check is sound and must stay;
+only the identifier comparison is wrong. Fix prompt is written at `.ai/prompts/P1-01-FIX.md` and is
+queued behind P1-04 on the backend lane.
 
-### What passed its gates this session
+The frontend behaved correctly throughout that failure: it rendered the mapped error with
+`next_steps` and the correlation id in a `<details>`, and refused to fabricate a context.
 
-- **Gate 1**: `OK: 15 checks passed`, run three times.
-- **Gate 2 PASS**: ruff `All checks passed` (was 227 errors), mypy `Success: no issues found in 52
-  source files` (was 4 errors, including the P0-08 `introspect_sdk.py:149` SimplePath vs Path),
-  pytest **342 passed** (was 308). Committed and pushed as `362c49f`.
-- **Gate 2 live proof**, run by the orchestrator rather than asserted: fixture mode returns 200 with
-  the contract envelope; `allowed_actions` are honest, with grant, edit_metadata and
-  transfer_ownership all `NOT_IMPLEMENTED` because the plan lifecycle does not exist yet; the grants
-  endpoint reports `group_membership_loaded: false` with the exact required limitation sentence and
-  refuses revoke on every inherited grant with `INHERITED_FROM_PARENT` plus a `navigate_to`.
-- **Fixture dataset** counted from the built readers: 3 catalogs, 12 schemas, 60 objects across all
-  required kinds, 25 principals with exactly 1 workspace-local group that is not UC eligible.
+### Three more harness defects of my own, found and fixed earlier today
 
-### Quota state, both lanes
+- `Build-Invocation` rendered `{lastmsg}` as an empty string when no last-message file was passed,
+  leaving `--output-last-message` dangling; codex then exited 2 before reaching the API, so every
+  backend quota probe died in a way that *looked* like a quota problem.
+- `resume.ps1` probed with the `tier_utility` model but resumed at the task's own tier. agy quota is
+  **per model**: `gemini-3.8-flash-medium` answered READY while `gemini-3.1-pro-high` was still
+  exhausted, so the probe said "quota is back" and the real resume burned a call and failed.
+- `resume.ps1` ignored `.ai/prompts/<TaskId>-resume.md` and sent a generic continuation whose step 4
+  told the agent to re-run the verification commands — on the agy lane, precisely the action that
+  ends the turn with nothing written.
 
-| Lane | Model | State |
-|---|---|---|
-| backend, codex | `gpt-5.6-terra` | **exhausted**, hit at the END of the run after the work had landed. Session `01a0c746` preserved, P1-READ record is `quota_exhausted`. Gate 2 nevertheless passes on the code it wrote, so nothing is outstanding but the quota itself |
-| frontend, agy | `gemini-3.1-pro-high` / `gemini-3.8-flash-high` | **exhausted**, resets about 4h20m from 07:45 UTC |
-| frontend, agy | `gemini-3.8-flash-medium` | had quota as of 07:53 UTC and carried both rejection rounds |
+### A misdiagnosis of my own, corrected
 
-**Quota on the agy lane is PER MODEL.** This was proven, not guessed: flash-medium answered READY
-while pro-high returned RESOURCE_EXHAUSTED in the same minute. Probe the model you intend to use.
+Gate 3 rejection 2 for P0-05 told the agent that a duplicate-match test failure came from an
+outer/inner span text ambiguity. It did not. `vitest.config.ts` sets `globals: false`, so
+`@testing-library/react` cannot register its automatic cleanup and every `render()` accumulated in
+one document until a query matched one element per preceding test. The agent cannot run tests and so
+could never have found this; it implemented my wrong diagnosis faithfully. Fixed with
+`frontend/vitest.setup.ts` plus a `setupFiles` entry. The accessibility work the agent did in
+response is kept on its own merit: actor and executor now carry accessible names saying which is the
+person and which is the executing service principal.
 
-### Three harness defects found and fixed, my own code
+## 2b. CONCURRENCY
 
-1. `Build-Invocation` rendered an empty `{lastmsg}` as a dangling `--output-last-message`, so every
-   codex quota probe exited 2 before reaching the API. The first backend resume reported "probe
-   failed", which reads like a quota problem and was not one.
-2. `resume.ps1` probed with the `tier_utility` model but resumed at the task's own tier, so the
-   per-model quota above made the probe lie and the resume burn a call. It now probes the highest
-   tier actually pending on that lane.
-3. `resume.ps1` ignored `.ai/prompts/<TaskId>-resume.md` and sent a generic continuation whose step
-   4 told the agent to re-run the verification commands — precisely what ends an agy turn with
-   nothing written. Per-task resume prompts now win, and the run record stores the model actually
-   used rather than one cached before a model switch.
+A scheduled resume session fired at 14:34 and was still running when the user resumed interactively.
+Two orchestrators driving the same lanes would double-spend the binding resource and could send two
+prompts into one agent session, so the scheduled session was stopped **after** its in-flight
+dispatch completed rather than mid-write. Everything it landed is kept. Do not run a scheduled
+continuation and an interactive session against this repo at the same time.
 
-### Still open
+## 3. NEXT IMMEDIATE ACTIONS
 
-- 39 tasks remain todo. Next by priority: **P1-04 and P1-05** the mutation plan lifecycle, then
-  P0-07, P0-09, P0-10, then P1-06 and P1-07 the asset and access UI, then Phase 2.
-- `P0-01` is still todo and unrelated to the above.
-- The deployed app at https://uc-governance-7474654536971820.aws.databricksapps.com is running the
-  PREVIOUS build. The Phase 1 read path is committed but **not deployed**.
-
-## 2b. SCHEDULED CONTINUATION
-
-A persisted one-shot task `uc-governance-resume` fires at **2026-09-22T14:34:00+07:00**, two minutes
-after codex's stated reset of 2:32 PM. It re-enters this work with a self-contained prompt, because
-scheduled runs start with no memory of this session. It resumes the backend first, then probes the
-frontend, then continues down the task board. Managed from the Scheduled section of the sidebar.
-
-## 3. NEXT IMMEDIATE ACTIONS (RESUME PROMPT)
-
-1. Confirm Gate 1: `uv run --no-project --with pyyaml --with jsonschema python scripts/validate_contracts.py` must print `OK: 15 checks passed`.
-2. Dispatch **P0-05** at `tier_standard`, frontend. The prompt is already written at `.ai/prompts/P0-05.md`. Before dispatching, prepend the agy file inventory the way `.ai/prompts/P0-04-continue.md` does, listing what exists under `frontend/src`, otherwise the agent will try to explore and lose its turn.
-3. Gate 3, then Gate 4. Expect at least one rejection round; that is normal and cheap through `-Continue`.
-4. Dispatch **P0-06** at `tier_standard`, backend: the fixture dataset and the fixture adapters implementing the same Protocols as the future SDK adapters, plus the scenario switches.
-5. Dispatch **P0-08** at `tier_reasoning`, backend: copy `docs/05-capability-matrix-starter.md` to `docs/capability-matrix.md`, then introspect the installed `databricks-sdk` 0.140.0 to confirm or deny every candidate method, filling `unknown` with confirmed names or `unsupported`. This unblocks all of Phase 1.
-6. Then P0-07, P0-09, P0-10, then Phase 1 per `tasks/TASK-BOARD.md`.
-7. Update this file after every dispatch batch.
+1. When P1-04 returns, run `./scripts/check_all.sh`. Send any failure back into the same session
+   with `./scripts/dispatch.ps1 -Agent backend -Tier tier_reasoning -TaskId P1-04 -PromptFile <reject> -Continue`.
+2. Dispatch **P1-01-FIX** on the backend lane, prompt already written. Then redeploy and re-verify
+   in a real browser session, which is the only place that defect reproduces.
+3. Dispatch **P1-05** (plan kinds: grant, revoke, transfer ownership, edit metadata) on the backend
+   lane at `tier_reasoning`. It plugs into the registry P1-04 defines.
+4. When the frontend lane's quota returns, dispatch **P1-06** at `tier_standard`; the prompt is
+   written at `.ai/prompts/P1-06.md` and already carries the file inventory and the no-shell rule.
+   Then P1-07, the Access tab.
+5. P0-07 is half done. `scripts/check_all.ps1` and `.sh` exist and run all eight gates; what is still
+   missing is `frontend/playwright.config.ts` and an `e2e/` directory, so the e2e and axe gates
+   cannot run. That half is frontend-lane work.
+6. Update this file after every dispatch batch.
 
 ```powershell
-./scripts/dispatch.ps1 -Agent backend  -Tier tier_reasoning -TaskId P0-03 -PromptFile .ai/prompts/P0-03.md
-./scripts/dispatch.ps1 -Agent frontend -Tier tier_standard  -TaskId P0-04 -PromptFile .ai/prompts/P0-04.md
-./scripts/dispatch.ps1 -Agent frontend -Tier tier_utility   -TaskId P0-04 -PromptFile .ai/prompts/P0-04-fix.md -Continue
+./scripts/dispatch.ps1 -Agent backend  -Tier tier_reasoning -TaskId P1-04      -PromptFile .ai/prompts/P1-04.md
+./scripts/dispatch.ps1 -Agent backend  -Tier tier_reasoning -TaskId P1-01-FIX  -PromptFile .ai/prompts/P1-01-FIX.md
+./scripts/dispatch.ps1 -Agent frontend -Tier tier_standard  -TaskId P1-06      -PromptFile .ai/prompts/P1-06.md
 ./scripts/resume.ps1 -Status
+./scripts/check_all.sh
 ```
 
 ## 4. AGENT CONFIGURATION LOG

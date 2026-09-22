@@ -59,8 +59,23 @@ env:
   # A SQL warehouse is needed for lineage, audit system tables, tags via SQL, and row filters.
   # - name: UCGOV_WAREHOUSE_ID
   #   valueFrom: sql-warehouse
-  #
-  # The HMAC key that makes mutation plans tamper-evident. Required before enabling write mode.
-  # Supply it from a secret resource, never as a literal value.
-  # - name: UCGOV_PLAN_HMAC_KEY
-  #   valueFrom: plan-hmac-key
+
+# The HMAC key that makes mutation plans tamper-evident. settings.py refuses to start in any
+# connected mode without at least 32 characters here, so the app cannot run unsigned.
+#
+# READ THIS BEFORE RELYING ON IT. This value is a literal in a file committed to a PUBLIC
+# repository, by explicit instruction on 2026-09-22. It is therefore public, and the property it
+# is supposed to provide -- spec section 9's "prevent client tampering through server-owned or
+# integrity-protected plans" -- does NOT hold against anyone who reads the repository. Such a
+# person could forge the binding of a plan they were shown, for example widening its targets or
+# privileges after the preview they were given.
+#
+# What still protects the workspace: execution re-authorizes and revalidates against live state,
+# and this deployment runs connected_readonly, where every mutation returns MODE_READ_ONLY. So the
+# forgery surface is real but currently unreachable.
+#
+# BEFORE ENABLING WRITE MODE, move this to a secret resource and rotate the value:
+#   - name: UCGOV_PLAN_HMAC_KEY
+#     valueFrom: plan-hmac-key
+  - name: UCGOV_PLAN_HMAC_KEY
+    value: "ItEsQZHuCB0hywuf8-q-Dad_Bp-xamxYJoCc_ONMNFI4VMqn"
