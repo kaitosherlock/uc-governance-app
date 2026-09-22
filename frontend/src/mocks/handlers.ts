@@ -582,6 +582,324 @@ const operationDuplicateFixture = {
   },
 };
 
+export const tagsFixture = {
+  success: true,
+  data: {
+    target: {
+      securable_type: "TABLE",
+      full_name: "sales.crm.orders",
+      kind: "table",
+      display_name: "orders",
+    },
+    tags: [
+      {
+        key: "data_domain",
+        value: "finance",
+        kind: "free_form",
+        allowed_actions: [
+          { action: "assign_tag", allowed: true },
+          { action: "remove_tag", allowed: true },
+        ],
+      },
+      {
+        key: "sensitivity",
+        value: "internal",
+        kind: "governed",
+        allowed_actions: [
+          { action: "assign_tag", allowed: true },
+          { action: "remove_tag", allowed: true },
+        ],
+      },
+      {
+        key: "system.classification",
+        value: "orders_table",
+        kind: "system",
+        allowed_actions: [
+          {
+            action: "assign_tag",
+            allowed: false,
+            reason: "System-controlled tags cannot be edited.",
+          },
+          {
+            action: "remove_tag",
+            allowed: false,
+            reason: "System-controlled tags cannot be edited.",
+          },
+        ],
+      },
+    ],
+    column_tags: {
+      id: [
+        {
+          key: "pii",
+          value: null,
+          kind: "governed",
+          allowed_actions: [
+            { action: "assign_tag", allowed: true },
+            { action: "remove_tag", allowed: true },
+          ],
+        },
+      ],
+    },
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "complete",
+    limitations: [
+      "Tags reflect catalog state at observation. Runtime SQL session tags are not shown.",
+    ],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000031",
+  },
+};
+
+export const tagPoliciesFixture = {
+  success: true,
+  data: [
+    {
+      key: "sensitivity",
+      description: "Data confidentiality classification tier",
+      allowed_values: ["public", "internal", "confidential", "restricted"],
+      allowed_actions: [
+        {
+          action: "edit",
+          allowed: false,
+          reason_code: "UNKNOWN",
+          reason: "Policy authority could not be determined.",
+        },
+      ],
+    },
+    {
+      key: "pii",
+      description: "Personally identifiable information classification",
+      allowed_values: null,
+      allowed_actions: [],
+    },
+    {
+      key: "retention",
+      description: "Data retention schedule classification",
+      allowed_values: [],
+      allowed_actions: [],
+    },
+  ],
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "complete",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000032",
+  },
+  page: { page_size: 50, next_page_token: null },
+};
+
+export const abacPoliciesFixture = {
+  success: true,
+  data: [
+    {
+      id: "fixture-policy-sales-sensitive-rows",
+      name: "filter_sales_internal",
+      policy_type: "row_filter",
+      scope: {
+        securable_type: "CATALOG",
+        full_name: "sales",
+        kind: "catalog",
+        display_name: "sales",
+      },
+      when_condition: "has_tag_value('sensitivity', 'internal')",
+      to_principals: ["analysts"],
+      except_principals: ["data-eng-owners"],
+      function_full_name: "shared_ref.governance.normalize_id",
+      match_columns: ["id"],
+      owner: "data-eng-owners",
+      created_at: "2026-09-20T21:00:00Z",
+      updated_at: "2026-09-21T08:00:00Z",
+      allowed_actions: [
+        { action: "edit", allowed: true },
+        { action: "delete", allowed: true },
+      ],
+    },
+  ],
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "complete",
+    limitations: [
+      "Policy definitions reflect catalog metadata. Effective evaluation depends on SQL compute runtime.",
+    ],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000033",
+  },
+  page: { page_size: 50, next_page_token: null },
+};
+
+export const abacPolicyImpactFixture = {
+  success: true,
+  data: {
+    disclaimer:
+      "Potentially affected within your visible scope. Not evaluated by Databricks.",
+    potentially_affected: [
+      {
+        securable_type: "TABLE",
+        full_name: "sales.crm.orders",
+        kind: "table",
+        display_name: "orders",
+        owner: "data-eng-owners",
+        comment: "Customer orders transaction table",
+        updated_at: "2026-09-20T20:00:00Z",
+        managed: "managed",
+        pipeline_managed: false,
+        allowed_actions: [],
+      },
+      {
+        securable_type: "TABLE",
+        full_name: "sales.crm.customers",
+        kind: "table",
+        display_name: "customers",
+        owner: "data-eng-owners",
+        comment: "Customer master record table",
+        updated_at: "2026-09-20T20:00:00Z",
+        managed: "managed",
+        pipeline_managed: false,
+        allowed_actions: [],
+      },
+    ],
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "partial_visibility",
+    limitations: [
+      "Impact was not evaluated by Databricks; this list is an approximation based on metadata.",
+      "Objects outside the caller's visible scope are not included.",
+    ],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000034",
+  },
+};
+
+export const rowAccessOrdersFixture = {
+  success: true,
+  data: {
+    target: {
+      securable_type: "TABLE",
+      full_name: "sales.crm.orders",
+      kind: "table",
+      display_name: "orders",
+    },
+    row_filter: {
+      function_full_name: "shared_ref.governance.normalize_id",
+      input_columns: ["id"],
+      attached_via: "abac_policy",
+      policy_id: "fixture-policy-sales-sensitive-rows",
+    },
+    column_masks: [],
+    allowed_actions: [],
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "complete",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000035",
+  },
+};
+
+export const rowAccessCustomersFixture = {
+  success: true,
+  data: {
+    target: {
+      securable_type: "TABLE",
+      full_name: "sales.crm.customers",
+      kind: "table",
+      display_name: "customers",
+    },
+    row_filter: {
+      function_full_name: "shared_ref.governance.normalize_id",
+      input_columns: ["id"],
+      attached_via: "direct",
+      policy_id: null,
+    },
+    column_masks: [
+      {
+        column: "email",
+        function_full_name: "shared_ref.governance.mask_email",
+        using_columns: [],
+        attached_via: "direct",
+        policy_id: null,
+      },
+    ],
+    allowed_actions: [
+      { action: "set_row_filter", allowed: true },
+      { action: "drop_row_filter", allowed: true },
+      { action: "set_column_mask", allowed: true },
+      { action: "drop_column_mask", allowed: true },
+    ],
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "complete",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000036",
+  },
+};
+
+export const functionNormalizeIdFixture = {
+  success: true,
+  data: {
+    full_name: "shared_ref.governance.normalize_id",
+    owner: "shared_ref-owners",
+    comment: "Normalizes row ID for internal auditing",
+    return_type: "BIGINT",
+    parameters: [{ name: "id", type_text: "BIGINT", position: 0 }],
+    language: "SQL",
+    dependents: [
+      {
+        kind: "downstream_table",
+        full_name: "sales.crm.orders",
+        source: "unity_catalog_api",
+        verified: true,
+      },
+    ],
+    used_as_policy_function: true,
+    allowed_actions: [],
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "complete",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000037",
+  },
+};
+
+export const functionMaskEmailFixture = {
+  success: true,
+  data: {
+    full_name: "shared_ref.governance.mask_email",
+    owner: "shared_ref-owners",
+    comment: "Masks customer email addresses according to PII rules",
+    return_type: "STRING",
+    parameters: [{ name: "email", type_text: "STRING", position: 0 }],
+    language: "SQL",
+    dependents: [
+      {
+        kind: "downstream_table",
+        full_name: "sales.crm.customers",
+        source: "unity_catalog_api",
+        verified: true,
+      },
+    ],
+    used_as_policy_function: true,
+    allowed_actions: [],
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:00:00Z",
+    completeness: "complete",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000038",
+  },
+};
+
 export type EndpointKind = "read" | "plan" | "execute" | "operation";
 
 export async function handleScenario(
@@ -994,6 +1312,88 @@ export const handlers = [
     });
   }),
 
+  // Tags endpoints (P2-01 / P2-06)
+  http.get("*/api/v1/assets/:securable_type/:full_name/tags", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario, "read");
+    if (scenarioRes) return scenarioRes;
+
+    return HttpResponse.json(tagsFixture);
+  }),
+
+  http.get("*/api/v1/tag-policies", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario, "read");
+    if (scenarioRes) return scenarioRes;
+
+    return HttpResponse.json(tagPoliciesFixture);
+  }),
+
+  // ABAC policies endpoints (P2-03 / P2-06)
+  http.get("*/api/v1/abac-policies", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario, "read");
+    if (scenarioRes) return scenarioRes;
+
+    return HttpResponse.json(abacPoliciesFixture);
+  }),
+
+  http.get("*/api/v1/abac-policies/:policy_id/impact", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario, "read");
+    if (scenarioRes) return scenarioRes;
+
+    return HttpResponse.json(abacPolicyImpactFixture);
+  }),
+
+  http.get("*/api/v1/abac-policies/:policy_id", async ({ request, params }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario, "read");
+    if (scenarioRes) return scenarioRes;
+
+    const policy =
+      abacPoliciesFixture.data.find((p) => p.id === params.policy_id) ||
+      abacPoliciesFixture.data[0];
+
+    return HttpResponse.json({
+      success: true,
+      data: policy,
+      meta: abacPoliciesFixture.meta,
+    });
+  }),
+
+  // Row filters & column masks endpoints (P2-04 / P2-06)
+  http.get("*/api/v1/assets/TABLE/:full_name/row-access", async ({ request, params }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario, "read");
+    if (scenarioRes) return scenarioRes;
+
+    const fullName = params.full_name as string;
+    if (fullName === "sales.crm.customers") {
+      return HttpResponse.json(rowAccessCustomersFixture);
+    }
+    return HttpResponse.json(rowAccessOrdersFixture);
+  }),
+
+  http.get("*/api/v1/functions/:full_name", async ({ request, params }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario, "read");
+    if (scenarioRes) return scenarioRes;
+
+    const fullName = params.full_name as string;
+    if (fullName === "shared_ref.governance.mask_email") {
+      return HttpResponse.json(functionMaskEmailFixture);
+    }
+    return HttpResponse.json(functionNormalizeIdFixture);
+  }),
+
   http.get("*/api/v1/assets/:securable_type/:full_name", async ({ request }) => {
     const url = new URL(request.url);
     const scenario = url.searchParams.get("scenario");
@@ -1036,6 +1436,120 @@ export const handlers = [
             ...planPreviewFixture.data,
             requires_typed_confirmation: true,
             typed_confirmation_value: "sales.crm.orders",
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    if (body.kind === "transfer_ownership") {
+      const targetName = body.targets?.[0]?.full_name || "sales.crm.orders";
+      const newOwner = (body.changes as Record<string, unknown> | undefined)?.new_owner as string || "analysts";
+      return HttpResponse.json(
+        {
+          ...planPreviewFixture,
+          data: {
+            ...planPreviewFixture.data,
+            kind: "transfer_ownership",
+            targets: body.targets || [
+              {
+                securable_type: "TABLE",
+                full_name: targetName,
+                kind: "table",
+                display_name: "orders",
+              },
+            ],
+            normalized_changes: [
+              {
+                target: body.targets?.[0] || {
+                  securable_type: "TABLE",
+                  full_name: targetName,
+                  kind: "table",
+                  display_name: "orders",
+                },
+                description: `Transfer ownership of TABLE ${targetName} to ${newOwner}`,
+                statement_preview: `ALTER TABLE \`${targetName.replace(/\./g, "`.`")}\` SET OWNER TO \`${newOwner}\``,
+              },
+            ],
+            requires_typed_confirmation: true,
+            typed_confirmation_value: targetName,
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    if (body.kind === "drop_row_filter" || body.kind === "drop_column_mask") {
+      const targetName = body.targets?.[0]?.full_name || "sales.crm.customers";
+      const colName = ((body.changes as Record<string, unknown> | undefined)?.column as string) || "email";
+      return HttpResponse.json(
+        {
+          ...planPreviewFixture,
+          data: {
+            ...planPreviewFixture.data,
+            kind: body.kind,
+            targets: body.targets || [
+              {
+                securable_type: "TABLE",
+                full_name: targetName,
+                kind: "table",
+                display_name: "customers",
+              },
+            ],
+            normalized_changes: [
+              {
+                target: body.targets?.[0] || {
+                  securable_type: "TABLE",
+                  full_name: targetName,
+                  kind: "table",
+                  display_name: "customers",
+                },
+                description:
+                  body.kind === "drop_row_filter"
+                    ? `Drop row filter from ${targetName}`
+                    : `Drop column mask on column ${colName} from ${targetName}`,
+                statement_preview:
+                  body.kind === "drop_row_filter"
+                    ? `ALTER TABLE \`${targetName.replace(/\./g, "`.`")}\` DROP ROW FILTER`
+                    : `ALTER TABLE \`${targetName.replace(/\./g, "`.`")}\` ALTER COLUMN \`${colName}\` DROP MASK`,
+              },
+            ],
+            impact: {
+              known: [`Data in ${targetName} may become visible to table readers.`],
+              unknown: [
+                "Downstream queries and users cannot enumerate without live query execution",
+                "No query was run",
+              ],
+            },
+            requires_typed_confirmation: true,
+            typed_confirmation_value: targetName,
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    if (body.kind === "delete_abac_policy") {
+      return HttpResponse.json(
+        {
+          ...planPreviewFixture,
+          data: {
+            ...planPreviewFixture.data,
+            kind: "delete_abac_policy",
+            normalized_changes: [
+              {
+                target: body.targets?.[0] || {
+                  securable_type: "CATALOG",
+                  full_name: "sales",
+                  kind: "catalog",
+                  display_name: "sales",
+                },
+                description: "Delete ABAC policy filter_sales_internal",
+                statement_preview: "DROP POLICY filter_sales_internal",
+              },
+            ],
+            requires_typed_confirmation: true,
+            typed_confirmation_value: "sales",
           },
         },
         { status: 201 },

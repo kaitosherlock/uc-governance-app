@@ -1,0 +1,23 @@
+{
+    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T165213Z-frontend-DEMO-01.log",
+    "tier":  "tier_reasoning",
+    "agent":  "frontend",
+    "session_id":  "cf6f0674-450d-4035-b98f-634f0760db93",
+    "finished_at":  "2026-09-22T16:55:52.7896508Z",
+    "seconds":  219,
+    "prompt_chars":  11029,
+    "started_at":  "2026-09-22T16:52:13.8942916Z",
+    "quota_pattern":  "resource[_ ]exhausted",
+    "model":  "gemini-3.8-flash-high",
+    "last_message_excerpt":  "",
+    "history":  [
+                    "2026-09-22T16:52:13.9123142Z dispatched",
+                    "2026-09-22T16:55:52.8180985Z quota_exhausted"
+                ],
+    "task_id":  "DEMO-01",
+    "status":  "quota_exhausted",
+    "effort":  "medium",
+    "exit_code":  3,
+    "attempt":  1,
+    "prompt_file":  ".ai/prompts/DEMO-01.md"
+}

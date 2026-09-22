@@ -1,17 +1,29 @@
 {
-    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T155918Z-frontend-P2-06.log",
-    "tier":  "tier_reasoning",
+    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T164546Z-frontend-P2-06.log",
+    "tier":  "tier_standard",
     "agent":  "frontend",
-    "session_id":  null,
+    "seconds":  291,
+    "session_id":  "e6324c2d-e958-4195-a77c-c5089c9eca67",
+    "finished_at":  "2026-09-22T16:50:37.3664655Z",
+    "quota_pattern":  "resource[_ ]exhausted",
     "model":  "gemini-3.8-flash-high",
-    "started_at":  "2026-09-22T15:59:18.6058227Z",
-    "prompt_chars":  7560,
+    "started_at":  "2026-09-22T16:45:46.6996007Z",
+    "last_message_excerpt":  "",
     "history":  [
-                    "2026-09-22T15:59:18.6119933Z dispatched"
+                    "2026-09-22T15:59:18.6119933Z dispatched",
+                    "2026-09-22T16:18:00.0865537Z completed",
+                    "2026-09-22T16:20:48.1029747Z dispatched",
+                    "2026-09-22T16:28:25.5224819Z completed",
+                    "2026-09-22T16:31:07.6529689Z dispatched",
+                    "2026-09-22T16:42:15.3256520Z completed",
+                    "2026-09-22T16:45:46.7096718Z dispatched",
+                    "2026-09-22T16:50:37.3740967Z quota_exhausted"
                 ],
-    "effort":  "medium",
     "task_id":  "P2-06",
-    "status":  "dispatched",
-    "attempt":  1,
-    "prompt_file":  ".ai/prompts/P2-06.md"
+    "prompt_chars":  4095,
+    "effort":  "medium",
+    "exit_code":  3,
+    "status":  "quota_exhausted",
+    "attempt":  4,
+    "prompt_file":  ".ai/prompts/P2-06-reject3.md"
 }

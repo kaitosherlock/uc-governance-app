@@ -7,11 +7,13 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  AbacPolicy,
   AssetDetail,
   AssetSummary,
   Capability,
   Context,
   DependenciesData,
+  FunctionDetail,
   GrantsData,
   Identity,
   ObjectKind,
@@ -20,9 +22,13 @@ import type {
   Plan,
   PlanCreateRequest,
   PlanExecuteRequest,
+  PolicyImpactData,
   Privilege,
+  RowAccessData,
   SecurableType,
   SuccessResponse,
+  TagPolicy,
+  TagsData,
 } from "@contracts/types";
 import { API_PATHS } from "@contracts/types";
 import { apiGet, apiPost } from "./client";
@@ -482,4 +488,216 @@ export function useReconcileOperation() {
       }),
   });
 }
+
+export interface AssetTagsQueryOptions {
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch tags for an asset (object + column tags). */
+export function useAssetTags(
+  securableType: SecurableType | string | null | undefined,
+  fullName: string | null | undefined,
+  options?: AssetTagsQueryOptions,
+) {
+  const retry = useDefaultRetry();
+  return useQuery<SuccessResponse<TagsData>, unknown>({
+    queryKey: [
+      "tags",
+      securableType ?? null,
+      fullName ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!securableType || !fullName) {
+        throw new Error("securableType and fullName are required");
+      }
+      return apiGet<TagsData>(API_PATHS.assetTags, {
+        params: { securable_type: securableType, full_name: fullName },
+        signal,
+      });
+    },
+    enabled: Boolean(securableType && fullName) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry,
+  });
+}
+
+export interface TagPoliciesQueryOptions {
+  page_token?: string | undefined;
+  page_size?: number | undefined;
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch tag policies (governed tag constraints). */
+export function useTagPolicies(options?: TagPoliciesQueryOptions) {
+  const retry = useDefaultRetry();
+  return useQuery<PagedResponse<TagPolicy>, unknown>({
+    queryKey: [
+      "tagPolicies",
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+        page_token: options?.page_token ?? null,
+        page_size: options?.page_size ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      const queryParams: Record<string, string | number | undefined> = {};
+      if (options?.page_token) queryParams["page_token"] = options.page_token;
+      if (options?.page_size !== undefined) queryParams["page_size"] = options.page_size;
+
+      const res = await apiGet<TagPolicy[]>(API_PATHS.tagPolicies, {
+        query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        signal,
+      });
+      return res as unknown as PagedResponse<TagPolicy>;
+    },
+    enabled: options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry,
+  });
+}
+
+export interface AbacPoliciesQueryOptions {
+  page_token?: string | undefined;
+  page_size?: number | undefined;
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch ABAC policies. */
+export function useAbacPolicies(options?: AbacPoliciesQueryOptions) {
+  const retry = useDefaultRetry();
+  return useQuery<PagedResponse<AbacPolicy>, unknown>({
+    queryKey: [
+      "abacPolicies",
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+        page_token: options?.page_token ?? null,
+        page_size: options?.page_size ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      const queryParams: Record<string, string | number | undefined> = {};
+      if (options?.page_token) queryParams["page_token"] = options.page_token;
+      if (options?.page_size !== undefined) queryParams["page_size"] = options.page_size;
+
+      const res = await apiGet<AbacPolicy[]>(API_PATHS.abacPolicies, {
+        query: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+        signal,
+      });
+      return res as unknown as PagedResponse<AbacPolicy>;
+    },
+    enabled: options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry,
+  });
+}
+
+/** Hook to fetch a single ABAC policy by ID. */
+export function useAbacPolicy(
+  policyId: string | null | undefined,
+  options?: { enabled?: boolean | undefined },
+) {
+  const retry = useDefaultRetry();
+  return useQuery<SuccessResponse<AbacPolicy>, unknown>({
+    queryKey: ["abacPolicy", policyId ?? null],
+    queryFn: ({ signal }) => {
+      if (!policyId) throw new Error("policyId is required");
+      return apiGet<AbacPolicy>(API_PATHS.abacPolicy, {
+        params: { policy_id: policyId },
+        signal,
+      });
+    },
+    enabled: Boolean(policyId) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry,
+  });
+}
+
+/** Hook to fetch potential impact of an ABAC policy (approximation within visible scope). */
+export function useAbacPolicyImpact(
+  policyId: string | null | undefined,
+  options?: { enabled?: boolean | undefined },
+) {
+  const retry = useDefaultRetry();
+  return useQuery<SuccessResponse<PolicyImpactData>, unknown>({
+    queryKey: ["abacPolicyImpact", policyId ?? null],
+    queryFn: ({ signal }) => {
+      if (!policyId) throw new Error("policyId is required");
+      return apiGet<PolicyImpactData>(API_PATHS.abacPolicyImpact, {
+        params: { policy_id: policyId },
+        signal,
+      });
+    },
+    enabled: Boolean(policyId) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry,
+  });
+}
+
+export interface RowAccessQueryOptions {
+  actorId?: string | null | undefined;
+  workspaceId?: string | null | undefined;
+  enabled?: boolean | undefined;
+}
+
+/** Hook to fetch row filters and column masks for a TABLE. */
+export function useRowAccess(
+  fullName: string | null | undefined,
+  options?: RowAccessQueryOptions,
+) {
+  const retry = useDefaultRetry();
+  return useQuery<SuccessResponse<RowAccessData>, unknown>({
+    queryKey: [
+      "rowAccess",
+      fullName ?? null,
+      {
+        actorId: options?.actorId ?? null,
+        workspaceId: options?.workspaceId ?? null,
+      },
+    ],
+    queryFn: async ({ signal }) => {
+      if (!fullName) throw new Error("fullName is required");
+      return apiGet<RowAccessData>(API_PATHS.rowAccess, {
+        params: { full_name: fullName },
+        signal,
+      });
+    },
+    enabled: Boolean(fullName) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry,
+  });
+}
+
+/** Hook to fetch details of a function used by a filter or mask. */
+export function useFunctionDetail(
+  fullName: string | null | undefined,
+  options?: { enabled?: boolean | undefined },
+) {
+  const retry = useDefaultRetry();
+  return useQuery<SuccessResponse<FunctionDetail>, unknown>({
+    queryKey: ["function", fullName ?? null],
+    queryFn: async ({ signal }) => {
+      if (!fullName) throw new Error("fullName is required");
+      return apiGet<FunctionDetail>(API_PATHS.function, {
+        params: { full_name: fullName },
+        signal,
+      });
+    },
+    enabled: Boolean(fullName) && options?.enabled !== false,
+    staleTime: DEFAULT_STALE_TIME,
+    retry,
+  });
+}
+
 

@@ -18,7 +18,7 @@ import { API_PATHS } from "@contracts/types";
 import { AlertCircle, AlertTriangle, CheckCircle2, Clock, HelpCircle, RefreshCw, X } from "lucide-react";
 import { apiGet } from "@/api/client";
 import { ApiError } from "@/api/errors";
-import { useCreatePlan, useExecutePlan, useReconcileOperation } from "@/api/queries";
+import { useCreatePlan, useExecutePlan, useReconcileOperation, useTagPolicies } from "@/api/queries";
 import { strings } from "@/lib/strings";
 
 export interface PlanFlowProps {
@@ -39,6 +39,20 @@ interface FormValues {
   privileges?: string[];
   new_owner?: string;
   comment?: string;
+  tag_key?: string;
+  tag_value?: string;
+  tag_column?: string;
+  function_full_name?: string;
+  input_columns?: string;
+  mask_column?: string;
+  using_columns?: string;
+  policy_name?: string;
+  policy_type?: "row_filter" | "column_mask";
+  when_condition?: string;
+  to_principals?: string;
+  except_principals?: string;
+  match_columns?: string;
+  policy_id?: string;
 }
 
 // Zod schema for input validation only per spec
@@ -52,6 +66,20 @@ const planFormSchema = z.object({
   privileges: z.array(z.string()).optional(),
   new_owner: z.string().optional(),
   comment: z.string().optional(),
+  tag_key: z.string().optional(),
+  tag_value: z.string().optional(),
+  tag_column: z.string().optional(),
+  function_full_name: z.string().optional(),
+  input_columns: z.string().optional(),
+  mask_column: z.string().optional(),
+  using_columns: z.string().optional(),
+  policy_name: z.string().optional(),
+  policy_type: z.enum(["row_filter", "column_mask"]).optional(),
+  when_condition: z.string().optional(),
+  to_principals: z.string().optional(),
+  except_principals: z.string().optional(),
+  match_columns: z.string().optional(),
+  policy_id: z.string().optional(),
 });
 
 function getInitialFormValues(kind: PlanKind, changes?: PlanChanges): FormValues {
@@ -69,6 +97,43 @@ function getInitialFormValues(kind: PlanKind, changes?: PlanChanges): FormValues
   } else if (kind === "edit_metadata") {
     const mc = changes as MetadataChanges;
     base.comment = mc.comment || "";
+  } else if (kind === "assign_tags" || kind === "remove_tags") {
+    const tc = changes as { column?: string | null; tags?: { key: string; value?: string | null }[] };
+    base.tag_column = tc.column || "";
+    base.tag_key = tc.tags?.[0]?.key || "";
+    base.tag_value = tc.tags?.[0]?.value || "";
+  } else if (kind === "set_row_filter") {
+    const rc = changes as { function_full_name?: string; input_columns?: string[] };
+    base.function_full_name = rc.function_full_name || "";
+    base.input_columns = rc.input_columns?.join(", ") || "";
+  } else if (kind === "set_column_mask") {
+    const mc = changes as { column?: string; function_full_name?: string; using_columns?: string[] };
+    base.mask_column = mc.column || "";
+    base.function_full_name = mc.function_full_name || "";
+    base.using_columns = mc.using_columns?.join(", ") || "";
+  } else if (kind === "drop_column_mask") {
+    const dc = changes as { column?: string | null };
+    base.mask_column = dc.column || "";
+  } else if (kind === "create_abac_policy" || kind === "update_abac_policy") {
+    const ap = changes as Record<string, unknown>;
+    base.policy_id = (ap["policy_id"] as string) || "";
+    base.policy_name = (ap["name"] as string) || "";
+    base.policy_type = (ap["policy_type"] as "row_filter" | "column_mask") || "row_filter";
+    base.when_condition = (ap["when_condition"] as string) || "";
+    base.to_principals = Array.isArray(ap["to_principals"])
+      ? (ap["to_principals"] as string[]).join(", ")
+      : ((ap["to_principals"] as string) || "");
+    base.except_principals = Array.isArray(ap["except_principals"])
+      ? (ap["except_principals"] as string[]).join(", ")
+      : ((ap["except_principals"] as string) || "");
+    base.function_full_name = (ap["function_full_name"] as string) || "";
+    base.match_columns = Array.isArray(ap["match_columns"])
+      ? (ap["match_columns"] as string[]).join(", ")
+      : ((ap["match_columns"] as string) || "");
+  } else if (kind === "delete_abac_policy") {
+    const ap = changes as Record<string, unknown>;
+    base.policy_id = (ap["policy_id"] as string) || "";
+    base.policy_name = (ap["name"] as string) || "";
   }
   return base;
 }
@@ -91,6 +156,19 @@ export function PlanFlow({
   const commentInputId = useId();
   const reasonInputId = useId();
   const typedConfirmInputId = useId();
+  const tagKeyInputId = useId();
+  const tagValueInputId = useId();
+  const tagColumnInputId = useId();
+  const functionFullNameInputId = useId();
+  const inputColumnsInputId = useId();
+  const maskColumnInputId = useId();
+  const usingColumnsInputId = useId();
+  const policyNameInputId = useId();
+  const policyTypeInputId = useId();
+  const whenConditionInputId = useId();
+  const toPrincipalsInputId = useId();
+  const exceptPrincipalsInputId = useId();
+  const matchColumnsInputId = useId();
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
@@ -113,6 +191,7 @@ export function PlanFlow({
   const createPlanMutation = useCreatePlan();
   const executePlanMutation = useExecutePlan();
   const reconcileMutation = useReconcileOperation();
+  const tagPoliciesQuery = useTagPolicies({ enabled: kind === "assign_tags" });
 
   // Form setup
   const initialValues = useMemo(
@@ -134,6 +213,15 @@ export function PlanFlow({
   const watchedValues = watch();
   const lastSubmittedValuesRef = useRef<FormValues | null>(null);
 
+  const selectedTagKey = watchedValues.tag_key || "";
+  const tagPoliciesData = tagPoliciesQuery.data ? tagPoliciesQuery.data.data : null;
+  const matchedTagPolicy = useMemo(() => {
+    if (!tagPoliciesData || !selectedTagKey) return null;
+    return tagPoliciesData.find(
+      (p) => p.key.toLowerCase() === selectedTagKey.trim().toLowerCase(),
+    );
+  }, [tagPoliciesData, selectedTagKey]);
+
   useEffect(() => {
     if (!plan) return;
     const submitted = lastSubmittedValuesRef.current;
@@ -144,7 +232,20 @@ export function PlanFlow({
       watchedValues.principal !== submitted.principal ||
       watchedValues.privilege !== submitted.privilege ||
       watchedValues.new_owner !== submitted.new_owner ||
-      watchedValues.comment !== submitted.comment;
+      watchedValues.comment !== submitted.comment ||
+      watchedValues.tag_key !== submitted.tag_key ||
+      watchedValues.tag_value !== submitted.tag_value ||
+      watchedValues.tag_column !== submitted.tag_column ||
+      watchedValues.function_full_name !== submitted.function_full_name ||
+      watchedValues.input_columns !== submitted.input_columns ||
+      watchedValues.mask_column !== submitted.mask_column ||
+      watchedValues.using_columns !== submitted.using_columns ||
+      watchedValues.policy_name !== submitted.policy_name ||
+      watchedValues.policy_type !== submitted.policy_type ||
+      watchedValues.when_condition !== submitted.when_condition ||
+      watchedValues.to_principals !== submitted.to_principals ||
+      watchedValues.except_principals !== submitted.except_principals ||
+      watchedValues.match_columns !== submitted.match_columns;
 
     if (hasChanged) {
       // Invalidate preview immediately when inputs change
@@ -200,14 +301,15 @@ export function PlanFlow({
   }, [isOpen, plan, isExecuting, onClose]);
 
   // Live countdown for plan expiration
+  const planExpiresAt = plan ? plan.expires_at : null;
   useEffect(() => {
-    if (!plan?.expires_at) {
+    if (!planExpiresAt) {
       setSecondsRemaining(null);
       return;
     }
 
     const computeSeconds = () => {
-      const diffMs = new Date(plan.expires_at).getTime() - Date.now();
+      const diffMs = new Date(planExpiresAt).getTime() - Date.now();
       return Math.max(0, Math.floor(diffMs / 1000));
     };
 
@@ -221,7 +323,7 @@ export function PlanFlow({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [plan?.expires_at]);
+  }, [planExpiresAt]);
 
   const isExpired = secondsRemaining !== null && secondsRemaining <= 0;
 
@@ -264,6 +366,69 @@ export function PlanFlow({
       } else if (kind === "edit_metadata") {
         changesPayload = {
           comment: values.comment || "",
+        };
+      } else if (kind === "assign_tags") {
+        changesPayload = {
+          column: values.tag_column ? values.tag_column.trim() : null,
+          tags: [
+            {
+              key: values.tag_key ? values.tag_key.trim() : "",
+              value: values.tag_value ? values.tag_value.trim() : null,
+            },
+          ],
+        };
+      } else if (kind === "remove_tags") {
+        changesPayload = {
+          column: values.tag_column ? values.tag_column.trim() : null,
+          tags: [
+            {
+              key: values.tag_key ? values.tag_key.trim() : "",
+              value: null,
+            },
+          ],
+        };
+      } else if (kind === "set_row_filter") {
+        changesPayload = {
+          function_full_name: values.function_full_name ? values.function_full_name.trim() : "",
+          input_columns: values.input_columns
+            ? values.input_columns.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+        };
+      } else if (kind === "drop_row_filter") {
+        changesPayload = {};
+      } else if (kind === "set_column_mask") {
+        changesPayload = {
+          column: values.mask_column ? values.mask_column.trim() : "",
+          function_full_name: values.function_full_name ? values.function_full_name.trim() : "",
+          using_columns: values.using_columns
+            ? values.using_columns.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+        };
+      } else if (kind === "drop_column_mask") {
+        changesPayload = {
+          column: values.mask_column ? values.mask_column.trim() : null,
+        };
+      } else if (kind === "create_abac_policy" || kind === "update_abac_policy") {
+        changesPayload = {
+          policy_id: values.policy_id ? values.policy_id.trim() : undefined,
+          name: values.policy_name ? values.policy_name.trim() : "",
+          policy_type: values.policy_type || "row_filter",
+          when_condition: values.when_condition ? values.when_condition.trim() : "",
+          to_principals: values.to_principals
+            ? values.to_principals.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+          except_principals: values.except_principals
+            ? values.except_principals.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+          function_full_name: values.function_full_name ? values.function_full_name.trim() : "",
+          match_columns: values.match_columns
+            ? values.match_columns.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+        };
+      } else if (kind === "delete_abac_policy") {
+        changesPayload = {
+          policy_id: values.policy_id ? values.policy_id.trim() : "",
+          name: values.policy_name ? values.policy_name.trim() : "",
         };
       }
 
@@ -323,6 +488,12 @@ export function PlanFlow({
         queryClient.invalidateQueries({ queryKey: ["grants"] });
         queryClient.invalidateQueries({ queryKey: ["asset"] });
         queryClient.invalidateQueries({ queryKey: ["schemaObjects"] });
+        queryClient.invalidateQueries({ queryKey: ["tags"] });
+        queryClient.invalidateQueries({ queryKey: ["tagPolicies"] });
+        queryClient.invalidateQueries({ queryKey: ["abacPolicies"] });
+        queryClient.invalidateQueries({ queryKey: ["abacPolicy"] });
+        queryClient.invalidateQueries({ queryKey: ["abacPolicyImpact"] });
+        queryClient.invalidateQueries({ queryKey: ["rowAccess"] });
         if (onSuccess) onSuccess(res.data);
       }
     } catch (err: unknown) {
@@ -381,17 +552,24 @@ export function PlanFlow({
   ]);
 
   // 3. Reconcile unknown outcome
+  const operationId = operation ? operation.id : null;
   const handleReconcile = useCallback(async () => {
-    if (!operation?.id || isReconciling) return;
+    if (!operationId || isReconciling) return;
     setIsReconciling(true);
 
     try {
-      const res = await reconcileMutation.mutateAsync(operation.id);
+      const res = await reconcileMutation.mutateAsync(operationId);
       setOperation(res.data);
       if (res.data.status !== "unknown") {
         queryClient.invalidateQueries({ queryKey: ["grants"] });
         queryClient.invalidateQueries({ queryKey: ["asset"] });
         queryClient.invalidateQueries({ queryKey: ["schemaObjects"] });
+        queryClient.invalidateQueries({ queryKey: ["tags"] });
+        queryClient.invalidateQueries({ queryKey: ["tagPolicies"] });
+        queryClient.invalidateQueries({ queryKey: ["abacPolicies"] });
+        queryClient.invalidateQueries({ queryKey: ["abacPolicy"] });
+        queryClient.invalidateQueries({ queryKey: ["abacPolicyImpact"] });
+        queryClient.invalidateQueries({ queryKey: ["rowAccess"] });
         if (onSuccess) onSuccess(res.data);
       }
     } catch (err: unknown) {
@@ -401,7 +579,7 @@ export function PlanFlow({
     } finally {
       setIsReconciling(false);
     }
-  }, [isReconciling, onSuccess, operation?.id, queryClient, reconcileMutation]);
+  }, [isReconciling, onSuccess, operationId, queryClient, reconcileMutation]);
 
   if (!isOpen) return null;
 
@@ -412,6 +590,15 @@ export function PlanFlow({
   else if (kind === "transfer_ownership") kindLabel = strings.planFlow.kinds.transfer_ownership;
   else if (kind === "edit_metadata") kindLabel = strings.planFlow.kinds.edit_metadata;
   else if (kind === "delete_asset") kindLabel = strings.planFlow.kinds.delete_asset;
+  else if (kind === "assign_tags") kindLabel = strings.planFlow.kinds.assign_tags;
+  else if (kind === "remove_tags") kindLabel = strings.planFlow.kinds.remove_tags;
+  else if (kind === "set_row_filter") kindLabel = strings.planFlow.kinds.set_row_filter;
+  else if (kind === "drop_row_filter") kindLabel = strings.planFlow.kinds.drop_row_filter;
+  else if (kind === "set_column_mask") kindLabel = strings.planFlow.kinds.set_column_mask;
+  else if (kind === "drop_column_mask") kindLabel = strings.planFlow.kinds.drop_column_mask;
+  else if (kind === "create_abac_policy") kindLabel = strings.planFlow.kinds.create_abac_policy;
+  else if (kind === "update_abac_policy") kindLabel = strings.planFlow.kinds.update_abac_policy;
+  else if (kind === "delete_abac_policy") kindLabel = strings.planFlow.kinds.delete_abac_policy;
 
   const isFormPending = createPlanMutation.isPending;
   const isTypedConfirmDisabled =
@@ -563,6 +750,377 @@ export function PlanFlow({
                   placeholder={strings.planFlow.form.commentPlaceholder}
                   className="w-full px-3 py-2 text-[var(--text-sm)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
                 />
+              </div>
+            )}
+
+            {/* Assign tags inputs */}
+            {kind === "assign_tags" && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor={tagColumnInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.tagColumn}
+                  </label>
+                  <input
+                    id={tagColumnInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("tag_column")}
+                    placeholder={strings.planFlow.form.tagColumnPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={tagKeyInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.tagKey}
+                  </label>
+                  <input
+                    id={tagKeyInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("tag_key", { required: true })}
+                    placeholder={strings.planFlow.form.tagKeyPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={tagValueInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.tagValue}
+                  </label>
+                  {matchedTagPolicy?.allowed_values && matchedTagPolicy.allowed_values.length > 0 ? (
+                    <div className="space-y-1">
+                      <select
+                        id={tagValueInputId}
+                        aria-label={strings.planFlow.form.tagValue}
+                        disabled={isFormPending || isExecuting}
+                        {...register("tag_value")}
+                        className="w-full px-3 py-2 text-[var(--text-sm)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                      >
+                        <option value="">(None / Empty)</option>
+                        {matchedTagPolicy.allowed_values.map((val) => (
+                          <option key={val} value={val}>
+                            {val}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-[var(--color-text-secondary)]">
+                        {strings.tagsTab.constrainedByPrefix}{" "}
+                        <span className="font-[var(--font-mono)]">
+                          {matchedTagPolicy.description ||
+                            strings.tagsTab.governedBadge}
+                        </span>
+                      </p>
+                    </div>
+                  ) : (
+                    <input
+                      id={tagValueInputId}
+                      type="text"
+                      disabled={isFormPending || isExecuting}
+                      {...register("tag_value")}
+                      placeholder={strings.planFlow.form.tagValuePlaceholder}
+                      className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Remove tags inputs */}
+            {kind === "remove_tags" && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor={tagColumnInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.tagColumn}
+                  </label>
+                  <input
+                    id={tagColumnInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("tag_column")}
+                    placeholder={strings.planFlow.form.tagColumnPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={tagKeyInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.tagKey}
+                  </label>
+                  <input
+                    id={tagKeyInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("tag_key", { required: true })}
+                    placeholder={strings.planFlow.form.tagKeyPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Set row filter inputs */}
+            {kind === "set_row_filter" && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor={functionFullNameInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.functionFullName}
+                  </label>
+                  <input
+                    id={functionFullNameInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("function_full_name", { required: true })}
+                    placeholder={strings.planFlow.form.functionFullNamePlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={inputColumnsInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.inputColumns}
+                  </label>
+                  <input
+                    id={inputColumnsInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("input_columns")}
+                    placeholder={strings.planFlow.form.inputColumnsPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Drop row filter notice */}
+            {kind === "drop_row_filter" && (
+              <div className="p-3 bg-[var(--color-neutral-1)] border border-[var(--color-border-subtle)] rounded-[var(--radius-control)] text-[var(--text-xs)] text-[var(--color-text-secondary)]">
+                <p>{strings.rowAccess.dropConfirmPrompt.replace("{target}", targets[0]?.full_name || "table")}</p>
+              </div>
+            )}
+
+            {/* Set column mask inputs */}
+            {kind === "set_column_mask" && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor={maskColumnInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.maskColumn}
+                  </label>
+                  <input
+                    id={maskColumnInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("mask_column", { required: true })}
+                    placeholder={strings.planFlow.form.maskColumnPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={functionFullNameInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.functionFullName}
+                  </label>
+                  <input
+                    id={functionFullNameInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("function_full_name", { required: true })}
+                    placeholder={strings.planFlow.form.functionFullNamePlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={usingColumnsInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.usingColumns}
+                  </label>
+                  <input
+                    id={usingColumnsInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("using_columns")}
+                    placeholder={strings.planFlow.form.usingColumnsPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Drop column mask inputs */}
+            {kind === "drop_column_mask" && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor={maskColumnInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.maskColumn}
+                  </label>
+                  <input
+                    id={maskColumnInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("mask_column", { required: true })}
+                    placeholder={strings.planFlow.form.maskColumnPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Create or Update ABAC Policy inputs */}
+            {(kind === "create_abac_policy" || kind === "update_abac_policy") && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor={policyNameInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.policyName}
+                  </label>
+                  <input
+                    id={policyNameInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("policy_name", { required: true })}
+                    placeholder={strings.planFlow.form.policyNamePlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={policyTypeInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.policyType}
+                  </label>
+                  <select
+                    id={policyTypeInputId}
+                    aria-label={strings.planFlow.form.policyType}
+                    disabled={isFormPending || isExecuting}
+                    {...register("policy_type")}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  >
+                    <option value="row_filter">Row Filter</option>
+                    <option value="column_mask">Column Mask</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={whenConditionInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.whenCondition}
+                  </label>
+                  <input
+                    id={whenConditionInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("when_condition", { required: true })}
+                    placeholder={strings.planFlow.form.whenConditionPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={functionFullNameInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.functionFullName}
+                  </label>
+                  <input
+                    id={functionFullNameInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("function_full_name", { required: true })}
+                    placeholder={strings.planFlow.form.functionFullNamePlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={toPrincipalsInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.toPrincipals}
+                  </label>
+                  <input
+                    id={toPrincipalsInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("to_principals")}
+                    placeholder={strings.planFlow.form.toPrincipalsPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={exceptPrincipalsInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.exceptPrincipals}
+                  </label>
+                  <input
+                    id={exceptPrincipalsInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("except_principals")}
+                    placeholder={strings.planFlow.form.exceptPrincipalsPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor={matchColumnsInputId}
+                    className="block text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                  >
+                    {strings.planFlow.form.matchColumns}
+                  </label>
+                  <input
+                    id={matchColumnsInputId}
+                    type="text"
+                    disabled={isFormPending || isExecuting}
+                    {...register("match_columns")}
+                    placeholder={strings.planFlow.form.matchColumnsPlaceholder}
+                    className="w-full px-3 py-2 text-[var(--text-sm)] font-[var(--font-mono)] bg-[var(--color-neutral-0)] border border-[var(--color-border-strong)] rounded-[var(--radius-control)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] disabled:opacity-60"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Delete ABAC Policy notice */}
+            {kind === "delete_abac_policy" && (
+              <div className="p-3 bg-[var(--color-danger-bg)] border border-[var(--color-danger)]/30 rounded-[var(--radius-control)] text-[var(--text-xs)] text-[var(--color-text-primary)]">
+                <p>
+                  {strings.policies.deleteConfirmPrompt.replace(
+                    "{name}",
+                    (watchedValues.policy_name || watchedValues.policy_id || "policy"),
+                  )}
+                </p>
               </div>
             )}
 

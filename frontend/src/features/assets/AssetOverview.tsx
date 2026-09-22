@@ -19,8 +19,11 @@ import { AssetActionControl } from "./AssetActionControl";
 import { AssetColumnsTable } from "./AssetColumnsTable";
 import { AssetDependenciesView } from "./AssetDependenciesView";
 import { AssetGrantsView } from "./AssetGrantsView";
+import { AssetRowAccessView } from "./AssetRowAccessView";
+import { AssetTagsView } from "./AssetTagsView";
 import { ErrorView, LimitationsView, LocalizedSkeleton } from "./StateViews";
 import { UnknownBadge } from "./UnknownBadge";
+import { PlanFlow } from "@/features/plans/PlanFlow";
 
 interface AssetOverviewProps {
   asset: AssetDetail;
@@ -62,6 +65,7 @@ const KNOWN_OBJECT_KINDS = new Set<string>([
 export function AssetOverview({ asset, meta, onRefresh }: AssetOverviewProps) {
   const [copiedFqn, setCopiedFqn] = useState(false);
   const [copiedLocation, setCopiedLocation] = useState(false);
+  const [isTransferOwnershipOpen, setIsTransferOwnershipOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get("tab") || "overview";
 
@@ -224,10 +228,19 @@ export function AssetOverview({ asset, meta, onRefresh }: AssetOverviewProps) {
         {/* Key metadata grid */}
         <div className="mt-[var(--space-4)] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[var(--space-3)] pt-[var(--space-3)] border-t border-[var(--color-border-subtle)] text-[var(--text-xs)]">
           <div className="space-y-1">
-            <span className="text-[var(--color-text-muted)] uppercase tracking-wider font-[var(--weight-medium)] flex items-center gap-1">
-              <User className="w-3 h-3 text-[var(--color-icon-muted)]" aria-hidden="true" />
-              {strings.assets.fields.owner}
-            </span>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[var(--color-text-muted)] uppercase tracking-wider font-[var(--weight-medium)] flex items-center gap-1">
+                <User className="w-3 h-3 text-[var(--color-icon-muted)]" aria-hidden="true" />
+                {strings.assets.fields.owner}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsTransferOwnershipOpen(true)}
+                className="text-[11px] font-[var(--weight-medium)] text-[var(--color-accent)] hover:underline focus:outline-none"
+              >
+                {strings.ownership.transferAction}
+              </button>
+            </div>
             <span className="font-[var(--font-mono)] text-[var(--color-text-primary)] font-[var(--weight-medium)] block">
               {asset.owner || strings.assets.fields.unassignedOwner}
             </span>
@@ -325,7 +338,15 @@ export function AssetOverview({ asset, meta, onRefresh }: AssetOverviewProps) {
             </span>
             <div className="flex flex-wrap items-start gap-2">
               {asset.allowed_actions.map((act) => (
-                <AssetActionControl key={act.action} action={act} />
+                <AssetActionControl
+                  key={act.action}
+                  action={act}
+                  onExecute={(actionName) => {
+                    if (actionName === "transfer_ownership") {
+                      setIsTransferOwnershipOpen(true);
+                    }
+                  }}
+                />
               ))}
             </div>
           </div>
@@ -364,11 +385,50 @@ export function AssetOverview({ asset, meta, onRefresh }: AssetOverviewProps) {
         >
           {strings.assets.tabs.access}
         </button>
+        <button
+          role="tab"
+          type="button"
+          aria-selected={currentTab === "tags"}
+          onClick={() => handleTabChange("tags")}
+          className={`px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] ${
+            currentTab === "tags"
+              ? "border-[var(--color-accent)] text-[var(--color-accent)] font-[var(--weight-semibold)]"
+              : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+          }`}
+        >
+          {strings.assets.tabs.tags}
+        </button>
+        {asset.securable_type === "TABLE" && (
+          <button
+            role="tab"
+            type="button"
+            aria-selected={currentTab === "filters"}
+            onClick={() => handleTabChange("filters")}
+            className={`px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] border-b-2 -mb-px transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring-color)] ${
+              currentTab === "filters"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)] font-[var(--weight-semibold)]"
+                : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            }`}
+          >
+            {strings.assets.tabs.filters}
+          </button>
+        )}
       </div>
 
       {currentTab === "access" ? (
         <AssetGrantsView
           securableType={asset.securable_type}
+          fullName={asset.full_name}
+          onRefresh={onRefresh}
+        />
+      ) : currentTab === "tags" ? (
+        <AssetTagsView
+          securableType={asset.securable_type}
+          fullName={asset.full_name}
+          onRefresh={onRefresh}
+        />
+      ) : currentTab === "filters" ? (
+        <AssetRowAccessView
           fullName={asset.full_name}
           onRefresh={onRefresh}
         />
@@ -480,6 +540,28 @@ export function AssetOverview({ asset, meta, onRefresh }: AssetOverviewProps) {
           {/* Meta limitations and completeness notice */}
           <LimitationsView meta={meta} />
         </>
+      )}
+
+      {/* Ownership transfer PlanFlow modal */}
+      {isTransferOwnershipOpen && (
+        <PlanFlow
+          kind="transfer_ownership"
+          targets={[
+            {
+              securable_type: asset.securable_type,
+              full_name: asset.full_name,
+            },
+          ]}
+          initialChanges={{
+            new_owner: "",
+          }}
+          isOpen={true}
+          onClose={() => setIsTransferOwnershipOpen(false)}
+          onSuccess={() => {
+            setIsTransferOwnershipOpen(false);
+            if (onRefresh) onRefresh();
+          }}
+        />
       )}
     </div>
   );

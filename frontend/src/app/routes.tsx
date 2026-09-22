@@ -14,6 +14,7 @@ import { AppShell } from "./AppShell";
 import { PageHeader } from "./PageHeader";
 import { strings } from "@/lib/strings";
 import { DataAssetsView } from "@/features/assets/DataAssetsView";
+import { PoliciesView } from "@/features/policies/PoliciesView";
 
 /* ---------- Page components ---------- */
 
@@ -37,12 +38,7 @@ function AccessManagementPage() {
 }
 
 function PoliciesPage() {
-  return (
-    <>
-      <PageHeader title={strings.pages.policies} description={strings.descriptions.policies} />
-      <PlaceholderContent text={strings.unavailable.policies} />
-    </>
-  );
+  return <PoliciesView />;
 }
 
 function ActivityPage() {
