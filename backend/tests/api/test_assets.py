@@ -46,6 +46,27 @@ def test_asset_detail_and_dependencies_have_exact_envelopes(client: TestClient) 
     assert dependencies.json()["data"]["known"][0]["full_name"] == "sales.crm.orders_daily_mv"
 
 
+def test_view_read_returns_definition_owner_dependencies_and_fixture_classification(
+    client: TestClient,
+) -> None:
+    dynamic = client.get("/api/v1/assets/TABLE/sales.crm.orders_for_analysts")
+    assert dynamic.status_code == 200
+    dynamic_data = dynamic.json()["data"]
+    assert dynamic_data["owner"] == "data-eng-owners"
+    assert "is_account_group_member('analysts')" in dynamic_data["view_definition"]
+    assert dynamic_data["raw"]["dynamic_view"] == "dynamic"
+    assert dynamic_data["raw"]["view_dependencies"] == [
+        {"kind": "table", "full_name": "sales.crm.orders"}
+    ]
+    dependencies = client.get("/api/v1/assets/TABLE/sales.crm.orders_for_analysts/dependencies")
+    assert dependencies.status_code == 200
+    assert dependencies.json()["data"]["known"][0]["full_name"] == "sales.crm.orders"
+
+    ordinary = client.get("/api/v1/assets/TABLE/sales.finance.summary")
+    assert ordinary.status_code == 200
+    assert ordinary.json()["data"]["raw"]["dynamic_view"] == "ordinary"
+
+
 def test_viewer_can_read_fixture_assets(monkeypatch, app: object) -> None:
     monkeypatch.setenv("UCGOV_FIXTURE_ACTOR", "victor.viewer")
     from app import main

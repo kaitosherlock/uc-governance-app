@@ -184,8 +184,10 @@ def get_asset(
         []
         if svc.settings.mode == Mode.FIXTURE
         else [
-            "Tags, storage locations, view definitions and non-allowlisted properties were not "
-            "loaded. Attachment provenance may be unknown."
+            "Tags, storage locations and non-allowlisted properties were not loaded. View "
+            "definitions and SDK-reported view dependencies are returned when available; dynamic "
+            "view classification is unavailable because the SDK does not expose it. Attachment "
+            "provenance may be unknown."
         ]
     )
     return w.AssetDetailResponse(

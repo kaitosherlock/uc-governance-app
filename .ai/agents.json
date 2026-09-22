@@ -37,7 +37,7 @@
                                    "quota":  {
                                                  "state":  "ok",
                                                  "exhausted_at":  null,
-                                                 "last_ok_at":  "2026-09-22T15:57:05.9067305Z",
+                                                 "last_ok_at":  "2026-09-22T16:12:26.2148870Z",
                                                  "note":  "Set to exhausted by dispatch.ps1 when the output matches a quota signature; cleared by resume.ps1 after a successful probe.",
                                                  "cleared_by":  "Corrected: the lane was never out of quota. It was flipped by the same detector false positive that mis-recorded P1-01-FIX. See quota_detection.marker_scoping_caveat."
                                              },

@@ -44,3 +44,13 @@ def drop_column_mask(table: str, column: str) -> str:
         f"ALTER TABLE {identifier(table, qualified=True)} ALTER COLUMN {identifier(column)} "
         "DROP MASK"
     )
+
+
+def replace_view_definition(view: str, definition: str) -> str:
+    """Build the only supported dynamic-view replacement statement.
+
+    A view definition is deliberately SQL text, not an identifier or a value that can be bound
+    into DDL. It is validated only as non-empty application input; Databricks parses it at
+    execution time. The view name remains a parsed and quoted UC identifier.
+    """
+    return f"CREATE OR REPLACE VIEW {identifier(view, qualified=True)} AS {definition}"

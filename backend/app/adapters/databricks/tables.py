@@ -19,6 +19,39 @@ if TYPE_CHECKING:
     from databricks.sdk.service.catalog import TablesAPI
 
 
+def view_metadata(value: object) -> dict[str, object]:
+    """Allowlist view metadata the pinned SDK actually returns on ``tables.get``.
+
+    ``TableInfo`` has no dynamic-view classification field.  It would be unsafe to decide from
+    SQL text whether a view is dynamic, so connected reads state that this is unavailable.
+    ``view_dependencies`` is omitted by list calls and can itself be absent from a get response.
+    """
+    raw: dict[str, object] = {
+        "dynamic_view": "unavailable",
+        "view_dependencies_status": "unavailable",
+    }
+    dependency_list = getattr(value, "view_dependencies", None)
+    dependencies = getattr(dependency_list, "dependencies", None)
+    if not isinstance(dependencies, list | tuple):
+        return raw
+    items: list[dict[str, str]] = []
+    partial = False
+    for dependency in dependencies:
+        table = text_field(getattr(dependency, "table", None), "table_full_name")
+        function = text_field(getattr(dependency, "function", None), "function_full_name")
+        if table is not None:
+            items.append({"kind": "table", "full_name": table})
+        elif function is not None:
+            items.append({"kind": "function", "full_name": function})
+        else:
+            # Connection and credential dependency names are not returned through this generic
+            # asset DTO. Their existence is not represented as a guessed table/function.
+            partial = True
+    raw["view_dependencies"] = items
+    raw["view_dependencies_status"] = "partial" if partial else "available"
+    return raw
+
+
 @boundary
 def map_table(value: object) -> AssetDetail:
     table_type = enum_field(value, "table_type")
@@ -115,6 +148,8 @@ def map_table(value: object) -> AssetDetail:
         )
         if function
         else None,
+        view_definition=text_field(value, "view_definition"),
+        raw=view_metadata(value) if table_type == "VIEW" else {},
     )
 
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from difflib import unified_diff
 from hashlib import sha256
 from typing import Protocol
 
@@ -39,7 +40,7 @@ from app.domain.models import (
 from app.domain.names import access_route, parts
 from app.domain.privileges import APPLICABILITY
 from app.domain.reads import ReadPolicy
-from app.errors import NotImplementedYet, ValidationFailed
+from app.errors import NotImplementedYet, PlanStale, ValidationFailed
 from app.mutations import sql_templates
 from app.mutations.core import MutationWriteResult, PlanKindHandler, Preview
 
@@ -96,6 +97,8 @@ class MutationAdapter(AssetReader, GrantReader, GrantWriter, PrincipalReader, Ta
         function_full_name: str | None,
         using_columns: tuple[str, ...],
     ) -> None: ...
+
+    def replace_view_definition(self, full_name: str, definition: str) -> None: ...
 
 
 def _field_error(field: str, code: str, message: str) -> ValidationFailed:
@@ -158,6 +161,12 @@ class _PolicyChanges:
     except_principals: tuple[str, ...]
     function_full_name: str
     match_columns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _ViewDefinitionChanges:
+    definition: str
+    expected_current_definition_hash: str
 
 
 _HAS_TAG = re.compile(r"^has_tag\('([A-Za-z0-9_.-]+)'\)$")
@@ -501,6 +510,65 @@ class FixturePlanKindHandler(PlanKindHandler):
         return sql_templates.drop_column_mask(target.full_name, change.column or "")
 
     @staticmethod
+    def _view_definition_hash(definition: str) -> str:
+        return sha256(definition.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _view_asset(asset: AssetDetail) -> None:
+        if asset.securable_type != SecurableType.TABLE or asset.kind != ObjectKind.VIEW:
+            raise _field_error(
+                "targets",
+                "UNSUPPORTED_FOR_TYPE",
+                "View-definition replacement is supported only for Unity Catalog views.",
+            )
+        if asset.view_definition is None:
+            raise _field_error(
+                "targets",
+                "UNAVAILABLE",
+                "The current view definition is unavailable, so it cannot be safely replaced.",
+            )
+
+    def _view_definition_changes(
+        self, changes: dict[str, object], asset: AssetDetail
+    ) -> _ViewDefinitionChanges:
+        self._view_asset(asset)
+        if set(changes) != {"definition", "expected_current_definition_hash"}:
+            raise _field_error(
+                "changes",
+                "INVALID",
+                "View-definition changes require only definition and "
+                "expected_current_definition_hash.",
+            )
+        definition = _string(changes.get("definition"), "changes.definition")
+        expected_hash = _string(
+            changes.get("expected_current_definition_hash"),
+            "changes.expected_current_definition_hash",
+        )
+        current = asset.view_definition
+        assert current is not None  # _view_asset has established this invariant.
+        if expected_hash != self._view_definition_hash(current):
+            raise PlanStale(
+                "The current view definition differs from the definition this request was based "
+                "on.",
+                next_steps=["Read the current definition and generate a new preview."],
+            )
+        return _ViewDefinitionChanges(
+            definition=definition, expected_current_definition_hash=expected_hash
+        )
+
+    @staticmethod
+    def _view_definition_diff(current: str, proposed: str) -> str:
+        return "\n".join(
+            unified_diff(
+                current.splitlines(),
+                proposed.splitlines(),
+                fromfile="current definition",
+                tofile="proposed definition",
+                lineterm="",
+            )
+        ) or "(No text changes.)"
+
+    @staticmethod
     def _tags_at(asset: AssetDetail, column: str | None) -> tuple[Tag, ...]:
         if column is None:
             return asset.tags
@@ -797,6 +865,12 @@ class FixturePlanKindHandler(PlanKindHandler):
         )
 
     def _state(self, target: w.AssetRef) -> object:
+        if self.kind == w.PlanKind.REPLACE_VIEW_DEFINITION:
+            asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
+            self._view_asset(asset)
+            # This state intentionally contains the definition text and no incidental metadata.
+            # A definition edit after preview is therefore always PLAN_STALE.
+            return {"view_definition": asset.view_definition}
         if self.kind in {
             w.PlanKind.CREATE_ABAC_POLICY,
             w.PlanKind.UPDATE_ABAC_POLICY,
@@ -947,6 +1021,7 @@ class FixturePlanKindHandler(PlanKindHandler):
             w.PlanKind.DELETE_ABAC_POLICY,
             w.PlanKind.DROP_ROW_FILTER,
             w.PlanKind.DROP_COLUMN_MASK,
+            w.PlanKind.REPLACE_VIEW_DEFINITION,
         }
         for requested in request.targets:
             target, asset = self._asset(requested)
@@ -1224,6 +1299,37 @@ class FixturePlanKindHandler(PlanKindHandler):
                     "USE SCHEMA, and compatible Databricks SQL or Runtime compute "
                     "(12.2 LTS or later)."
                 )
+            elif self.kind == w.PlanKind.REPLACE_VIEW_DEFINITION:
+                view_changes = self._view_definition_changes(request.changes, asset)
+                current_definition = asset.view_definition
+                assert current_definition is not None  # _view_definition_changes checked it.
+                diff = self._view_definition_diff(current_definition, view_changes.definition)
+                normalized.append(
+                    w.NormalizedChange(
+                        target=target,
+                        description=(
+                            f"Replace the full definition of view `{target.full_name}`. "
+                            f"Unified diff:\n{diff}"
+                        ),
+                        statement_preview=sql_templates.replace_view_definition(
+                            target.full_name, view_changes.definition
+                        ),
+                    )
+                )
+                known.append(
+                    "The unified diff compares the current stored definition with the proposed "
+                    "definition. Replacing it permanently removes the previous text from this "
+                    "application's view."
+                )
+                unknown.append(
+                    "The application did not parse, validate, or execute the proposed view "
+                    "definition against a warehouse. A clean preview does not mean the SQL is "
+                    "valid."
+                )
+                prerequisites.append(
+                    "Requires a configured SQL warehouse and Databricks authorization to replace "
+                    "this view; the application does not infer those privileges."
+                )
             elif self.kind in {
                 w.PlanKind.CREATE_ABAC_POLICY,
                 w.PlanKind.UPDATE_ABAC_POLICY,
@@ -1403,6 +1509,19 @@ class FixturePlanKindHandler(PlanKindHandler):
                 status="applied",
                 summary="Direct row-access control change was sent and will be read back.",
             )
+        if self.kind == w.PlanKind.REPLACE_VIEW_DEFINITION:
+            asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
+            view_changes = self._view_definition_changes(changes, asset)
+            if asset.view_definition == view_changes.definition:
+                return MutationWriteResult(
+                    status="applied",
+                    summary="No write was necessary; the view definition already matches.",
+                )
+            self.adapter.replace_view_definition(target.full_name, view_changes.definition)
+            return MutationWriteResult(
+                status="applied",
+                summary="View-definition replacement was sent and will be read back.",
+            )
         if self.kind in {
             w.PlanKind.CREATE_ABAC_POLICY,
             w.PlanKind.UPDATE_ABAC_POLICY,
@@ -1483,6 +1602,11 @@ class FixturePlanKindHandler(PlanKindHandler):
                 and control_current.using_columns == control.input_columns[1:]
                 and control_current.attached_via.value == "direct"
             )
+        if self.kind == w.PlanKind.REPLACE_VIEW_DEFINITION:
+            asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
+            self._view_asset(asset)
+            definition = _string(changes.get("definition"), "changes.definition")
+            return asset.view_definition == definition
         if self.kind in {
             w.PlanKind.CREATE_ABAC_POLICY,
             w.PlanKind.UPDATE_ABAC_POLICY,
@@ -1529,6 +1653,7 @@ def register_fixture_plan_kinds(
             w.PlanKind.DROP_ROW_FILTER,
             w.PlanKind.SET_COLUMN_MASK,
             w.PlanKind.DROP_COLUMN_MASK,
+            w.PlanKind.REPLACE_VIEW_DEFINITION,
         )
     )
 
@@ -1550,5 +1675,6 @@ def register_connected_readonly_plan_kinds() -> tuple[RegisteredPlanKind, ...]:
             w.PlanKind.DROP_ROW_FILTER,
             w.PlanKind.SET_COLUMN_MASK,
             w.PlanKind.DROP_COLUMN_MASK,
+            w.PlanKind.REPLACE_VIEW_DEFINITION,
         )
     )

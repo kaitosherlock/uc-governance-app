@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import replace
+from hashlib import sha256
 
 import pytest
 from app.adapters.fixtures.readers import FixtureReaders
@@ -373,6 +374,10 @@ def test_readonly_mode_rejects_each_registered_kind_before_any_write(
             "using_columns": [],
         },
         w.PlanKind.DROP_COLUMN_MASK: {"column": "email"},
+        w.PlanKind.REPLACE_VIEW_DEFINITION: {
+            "definition": "SELECT id FROM sales.crm.orders",
+            "expected_current_definition_hash": "not-read-in-readonly-mode",
+        },
     }
     for kind, payload in changes.items():
         with pytest.raises(ModeReadOnly):
@@ -381,6 +386,110 @@ def test_readonly_mode_rejects_each_registered_kind_before_any_write(
 
 def filter_request(kind: w.PlanKind, changes: dict[str, object]) -> w.PlanCreateRequest:
     return request(kind, changes, "sales.crm.customers")
+
+
+def view_changes(definition: str) -> dict[str, object]:
+    current = (
+        "SELECT id\n"
+        "FROM sales.crm.orders\n"
+        "WHERE is_account_group_member('analysts')"
+    )
+    return {
+        "definition": definition,
+        "expected_current_definition_hash": sha256(current.encode("utf-8")).hexdigest(),
+    }
+
+
+def view_request(changes: dict[str, object]) -> w.PlanCreateRequest:
+    return request(w.PlanKind.REPLACE_VIEW_DEFINITION, changes, "sales.crm.orders_for_analysts")
+
+
+def test_view_definition_preview_has_full_diff_and_validation_disclaimer() -> None:
+    plan = fixture_engine().build(
+        view_request(view_changes("SELECT id FROM sales.crm.orders WHERE id > 100")), identity()
+    )
+
+    preview = plan.normalized_changes[0]
+    assert "--- current definition" in preview.description
+    assert "+++ proposed definition" in preview.description
+    assert "-WHERE is_account_group_member('analysts')" in preview.description
+    assert "+SELECT id FROM sales.crm.orders WHERE id > 100" in preview.description
+    assert plan.requires_typed_confirmation is True
+    assert plan.typed_confirmation_value == "sales.crm.orders_for_analysts"
+    assert any("did not parse, validate, or execute" in item for item in plan.impact.unknown)
+
+
+def test_view_definition_change_after_preview_is_stale() -> None:
+    engine = fixture_engine()
+    plan = engine.build(view_request(view_changes("SELECT id FROM sales.crm.orders")), identity())
+    adapter = engine.registry.get(w.PlanKind.REPLACE_VIEW_DEFINITION).adapter  # type: ignore[attr-defined]
+    adapter.replace_view_definition("sales.crm.orders_for_analysts", "SELECT 42 AS changed")
+
+    with pytest.raises(PlanStale):
+        engine.execute(
+            plan.id,
+            w.PlanExecuteRequest(
+                confirmation_token=plan.confirmation_token,
+                typed_name="sales.crm.orders_for_analysts",
+            ),
+            identity(),
+            "fixture-correlation",
+        )
+
+
+def test_view_definition_requires_typed_confirmation_and_reads_back() -> None:
+    engine = fixture_engine()
+    new_definition = "SELECT id FROM sales.crm.orders WHERE id > 100"
+    plan = engine.build(view_request(view_changes(new_definition)), identity())
+
+    with pytest.raises(ValidationFailed):
+        engine.execute(
+            plan.id,
+            w.PlanExecuteRequest(
+                confirmation_token=plan.confirmation_token,
+                typed_name="wrong-view-name",
+            ),
+            identity(),
+            "fixture-correlation",
+        )
+    operation = engine.execute(
+        plan.id,
+        w.PlanExecuteRequest(
+            confirmation_token=plan.confirmation_token,
+            typed_name="sales.crm.orders_for_analysts",
+        ),
+        identity(),
+        "fixture-correlation",
+    )
+    assert operation.targets[0].verified is True
+
+
+def test_view_template_quotes_a_crafted_view_name() -> None:
+    adapter = FixtureReaders()
+    crafted = 'sales.crm.`orders_for_analysts"; DROP TABLE grants; --`'
+    original = adapter.get_asset("TABLE", "sales.crm.orders_for_analysts")
+    adapter.assets[("TABLE", crafted)] = replace(original, full_name=crafted)
+    registry = PlanKindRegistry()
+    for handler in register_fixture_plan_kinds(adapter, tuple(APPLICABILITY)):
+        registry.register(handler)
+    current = original.view_definition
+    assert current is not None
+    plan = MutationEngine(Settings(mode=Mode.FIXTURE), registry).build(
+        request(
+            w.PlanKind.REPLACE_VIEW_DEFINITION,
+            {
+                "definition": "SELECT id FROM sales.crm.orders",
+                "expected_current_definition_hash": sha256(current.encode("utf-8")).hexdigest(),
+            },
+            crafted,
+        ),
+        identity(),
+    )
+
+    preview = plan.normalized_changes[0].statement_preview
+    assert preview.startswith(
+        "CREATE OR REPLACE VIEW `sales`.`crm`.`orders_for_analysts\"; DROP TABLE grants; --` AS "
+    )
 
 
 def test_filter_and_mask_plan_kinds_write_and_read_back() -> None:

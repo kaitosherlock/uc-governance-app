@@ -437,3 +437,7 @@ class FixtureReaders:
                 for item in asset.columns
             ),
         )
+
+    def replace_view_definition(self, full_name: str, definition: str) -> None:
+        asset = self.get_asset("TABLE", full_name)
+        self.assets[("TABLE", full_name)] = replace(asset, view_definition=definition)

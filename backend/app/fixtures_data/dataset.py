@@ -112,6 +112,7 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
                 entries = [
                     ("orders", "table"),
                     ("customers", "table"),
+                    ("orders_for_analysts", "view"),
                     ("orders_daily_mv", "materialized_view"),
                     ("raw_exports", "volume"),
                     ("orders_stream", "streaming_table"),
@@ -185,6 +186,32 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
                 ),
             ),
         ),
+    )
+    dynamic_view = result["TABLE", "sales.crm.orders_for_analysts"]
+    result["TABLE", dynamic_view.full_name] = replace(
+        dynamic_view,
+        view_definition=(
+            "SELECT id\n"
+            "FROM sales.crm.orders\n"
+            "WHERE is_account_group_member('analysts')"
+        ),
+        raw={
+            "dynamic_view": "dynamic",
+            "view_dependencies_status": "available",
+            "view_dependencies": [{"kind": "table", "full_name": "sales.crm.orders"}],
+        },
+    )
+    ordinary_view = result["TABLE", "sales.finance.summary"]
+    result["TABLE", ordinary_view.full_name] = replace(
+        ordinary_view,
+        view_definition="SELECT id FROM sales.finance.records",
+        raw={
+            "dynamic_view": "ordinary",
+            "view_dependencies_status": "available",
+            "view_dependencies": [
+                {"kind": "table", "full_name": "sales.finance.records"}
+            ],
+        },
     )
     model = result["REGISTERED_MODEL", "shared_ref.ml.demand_forecast"]
     result["REGISTERED_MODEL", model.full_name] = replace(model, raw={"versions": [1, 2]})
@@ -317,5 +344,21 @@ DEPENDENCIES = {
             source="fixture",
             verified=True,
         ),
-    )
+    ),
+    "sales.crm.orders_for_analysts": (
+        Dependency(
+            kind=DependencyKind.DOWNSTREAM_TABLE,
+            full_name="sales.crm.orders",
+            source="fixture",
+            verified=True,
+        ),
+    ),
+    "sales.finance.summary": (
+        Dependency(
+            kind=DependencyKind.DOWNSTREAM_TABLE,
+            full_name="sales.finance.records",
+            source="fixture",
+            verified=True,
+        ),
+    ),
 }
