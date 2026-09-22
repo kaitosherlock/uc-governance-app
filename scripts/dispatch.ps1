@@ -29,6 +29,10 @@ param(
     [int]$TimeoutMinutes = 45,
     [switch]$DryRun,
     [switch]$SkipGate1,
+    # When the lane is flagged out of quota, probe it instead of deferring blindly. The flag is a
+    # cache of the last observed exhaustion and goes stale the moment the provider's window resets,
+    # so an unattended dispatch armed for a known reset time would otherwise always die on it.
+    [switch]$ProbeIfExhausted,
     # Continue the task's existing agent session instead of starting a new one. Use this to send a
     # gate rejection back to the agent that wrote the code, so it keeps the context of its own work.
     [switch]$Continue
@@ -50,9 +54,44 @@ if ($spec.status -ne 'READY') {
     throw "Refusing to dispatch to an agent that is not READY."
 }
 if ($spec.quota.state -eq 'exhausted') {
-    Write-Host "DEFERRED: agent '$Agent' is marked out of quota since $($spec.quota.exhausted_at)." -ForegroundColor Yellow
-    Write-Host "  Run ./scripts/resume.ps1 -Agent $Agent   to probe and continue pending work." -ForegroundColor Yellow
-    exit 75
+    if (-not $ProbeIfExhausted) {
+        Write-Host "DEFERRED: agent '$Agent' is marked out of quota since $($spec.quota.exhausted_at)." -ForegroundColor Yellow
+        Write-Host "  Run ./scripts/resume.ps1 -Agent $Agent   to probe and continue pending work." -ForegroundColor Yellow
+        Write-Host "  Or re-run with -ProbeIfExhausted to let this script check for itself." -ForegroundColor Yellow
+        exit 75
+    }
+
+    # Probe with the model THIS dispatch will actually use. Quota is per-model on the agy lane: on
+    # 2026-09-22 gemini-3.8-flash-medium answered READY while gemini-3.1-pro-high was still
+    # RESOURCE_EXHAUSTED, so probing a cheaper tier would report "quota is back" and the real run
+    # would then burn a call and fail.
+    $probeModel = $spec.models.$Tier
+    if ([string]::IsNullOrWhiteSpace($probeModel)) { throw "No model bound for tier '$Tier' on agent '$Agent'." }
+    Write-Host "Lane '$Agent' is flagged out of quota. Probing '$probeModel' before deferring..." -ForegroundColor Cyan
+
+    $probeLog = Join-Path (Join-Path $root $config.dispatch_rules.log_dir) `
+        ("probe-$Agent-" + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ') + '.log')
+    $probeInv = Build-Invocation -Spec $spec -Config $config -Model $probeModel `
+        -Effort 'low' -Root $root -LastMessageFile ''
+    $probe = Invoke-AgentRun -Invocation $probeInv `
+        -Prompt 'Reply with the single word READY. Do not read or modify any file.' `
+        -LogFile $probeLog -Header "quota probe for $Agent" -TimeoutMinutes 5
+
+    if (Test-QuotaExhausted -Text $probe.Output -Config $config -ExitCode $probe.ExitCode) {
+        Write-Host "DEFERRED: '$Agent' is still out of quota on '$probeModel'." -ForegroundColor Yellow
+        Set-AgentQuotaState -Root $root -Config $config -Agent $Agent -State 'exhausted'
+        exit 75
+    }
+    if ($probe.ExitCode -ne 0) {
+        Write-Host "DEFERRED: probe exited $($probe.ExitCode), which is not a quota signature." -ForegroundColor Red
+        Write-Host "  Inspect $probeLog before assuming this is a quota problem." -ForegroundColor Red
+        exit 75
+    }
+
+    Write-Host "  quota is back on '$probeModel'. Clearing the flag and continuing." -ForegroundColor Green
+    Set-AgentQuotaState -Root $root -Config $config -Agent $Agent -State 'ok'
+    $config = Get-AgentConfig -Root $root
+    $spec = $config.agents.$Agent
 }
 
 $cli = Get-Command $spec.cli -ErrorAction SilentlyContinue
