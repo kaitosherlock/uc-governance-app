@@ -22,8 +22,33 @@
 >   clock must be pinned** into the frozen plan fixture's 2026-09-21T09:05:30Z–09:15:30Z window,
 >   or every preview is pre-expired and the grant journey cannot run. Details in `tasks/STATUS.md`
 >   at 19:56.
-> - **P2-01 (tags) was dispatched to the backend lane at 19:47:18** and is UNVERIFIED and
->   UNCOMMITTED. Prompt `.ai/prompts/P2-01.md`, run record `.ai/state/runs/P2-01.json`.
+> - **P2-01 (tags) FAILED.** Dispatched 19:47:18, exit **-1** after 734s, empty last message,
+>   status `failed`, `quota_pattern` empty — so this is **not** a quota deferral and
+>   `resume.ps1` will **not** pick it up. It most likely died from the lane collision below.
+>
+>   **The tree is currently RED and the work is worth continuing, not restarting.** Gates I ran
+>   on the tree as left: `mypy` clean on **57** source files (was 56 — the new
+>   `backend/app/adapters/databricks/tags.py` typechecks), `pytest` **404 passed, 2 failed**,
+>   `ruff` **8 errors**, all cosmetic and all in P2-01's own test files, i.e. the tidy-up pass it
+>   never reached. The two failures are the unfinished edges:
+>     1. `test_route_manifest_requires_a_decision_for_every_v1_route` — extra `getTags` and
+>        `listTagPolicies`. This is P1-09's guard **working as designed**: two new v1 routes with
+>        no authorization expectation. Fix by registering the decision. **Never** by loosening the
+>        manifest — it is the only thing stopping an unauthorized route shipping unnoticed.
+>     2. `test_remaining_unregistered_plan_kind_returns_not_implemented` — 201 where 501 expected,
+>        because `assign_tags`/`remove_tags` are now registered and that older test still lists
+>        them as unregistered.
+>
+>   **Recovery is one command and keeps the context.** The session survived the failure:
+>   `01a0c928-0b4e-70f0-8cf9-819b2e1a8f0c` in `.ai/state/runs/P2-01.json` →
+>   `./scripts/dispatch.ps1 -Agent backend -Tier tier_reasoning -TaskId P2-01 -PromptFile <reject> -Continue`.
+>   I did not hand-patch it (product code is the agent's) and did not send the continuation (the
+>   lane was busy again at 19:59:28, and that collision is what killed it).
+>
+> - **Do not revert `backend/**` to get a green tree.** `P1-ERR-backend` **completed cleanly**
+>   (exit 0, 469s) in the same window and edited overlapping files — `api/mappers.py`,
+>   `auth/actor.py`, `tests/unit/test_exception_translation.py`. Two agents' work is interleaved
+>   there. Untangle by reading, not by reverting.
 >
 > ### Why this run stopped early — CONCURRENCY COLLISION
 >
