@@ -1,5 +1,58 @@
 # ORCHESTRATION HANDOVER STATE
 
+> ## READ THIS FIRST — appended 2026-09-22T19:56+07:00 by the SCHEDULED run
+>
+> **Everything below this block is stale.** It is timestamped 15:15 and says P1-04 is in flight.
+> Since then P1-04, P1-05, P1-06, P1-07, P1-08 and P1-09 have all landed and been gate-verified;
+> see the bottom of `tasks/STATUS.md`, which is current. Phase 1 backend is complete. The Phase 1
+> frontend remainder is P1-10 (e2e journeys) and P1-11 (screenshots).
+>
+> ### State I verified at 19:44, cold
+>
+> - Gate 1: `OK: 15 checks passed`.
+> - `./scripts/check_all.sh`: **All 8 checks passed**, tree clean, `main` level with `origin/main`.
+> - `./scripts/resume.ps1 -Status`: both lanes `READY`, quota `ok`, **resume queue empty**.
+>
+> ### What this run did
+>
+> - **P0-07 is now DONE, both halves.** `frontend/playwright.config.ts` and `frontend/e2e/` exist
+>   and **Gate 4 e2e** is wired into both runners, on by default. `check_all.sh --skip-backend`
+>   reports `All 6 checks passed`. Committed **93c55b9**, pushed. Two prerequisites were found by
+>   running it and are pinned by `e2e/harness.spec.ts`; the important one is that **the browser
+>   clock must be pinned** into the frozen plan fixture's 2026-09-21T09:05:30Z–09:15:30Z window,
+>   or every preview is pre-expired and the grant journey cannot run. Details in `tasks/STATUS.md`
+>   at 19:56.
+> - **P2-01 (tags) was dispatched to the backend lane at 19:47:18** and is UNVERIFIED and
+>   UNCOMMITTED. Prompt `.ai/prompts/P2-01.md`, run record `.ai/state/runs/P2-01.json`.
+>
+> ### Why this run stopped early — CONCURRENCY COLLISION
+>
+> Seventy-eight seconds after my P2-01 dispatch, a dispatch I did not make (`P1-ERR-backend`)
+> started on the **same lane**, then `P1-ERR-frontend` at 19:49, then a fourth codex process at
+> 19:52. Those prompts describe defects observed **live on the deployed app against a real
+> workspace**, which no scheduled run could have done. A second, interactive orchestrator is
+> driving this repo.
+>
+> Section 2b below says exactly this must not happen, and its recorded precedent is that the
+> **scheduled** session yields. So this run **dispatched nothing further**, did not run the
+> backend gates (two codex agents were writing `backend/**`, and a mixed result would be
+> attributed to the wrong task), and committed only its own harness files, which touch neither
+> `frontend/src/**` nor `backend/**`.
+>
+> ### What the next run must do
+>
+> 1. **Do not trust the P2-01 row until you have re-run the gates.** P2-01 and P1-ERR-backend
+>    edited `backend/app/**` concurrently. Review them together.
+> 2. `./scripts/check_all.sh` in full, then reconcile `tasks/TASK-BOARD.md` against what the gates
+>    actually say — two agents claimed rows in this window.
+> 3. Frontend next is **P1-10**, and its prompt is NOT yet written. Before writing it, read the
+>    19:56 `tasks/STATUS.md` note on `?scenario=` propagation: a page-level scenario applied
+>    globally **breaks the app shell**, and only the unknown-outcome/reconcile journey needs
+>    scenario control at all.
+> 4. The **axe/a11y gate is wired and empty** — `@axe-core/playwright` is installed and
+>    `npm run e2e:a11y` greps `@a11y`, but no tagged spec exists.
+
+
 - **Timestamp**: 2026-09-22T15:15:00+07:00
 - **Current Phase**: Phase 1 — the read spine is complete and verified. Eight read endpoints, the typed API client, the query layer and the MSW mocks all land and pass their gates. The mutation core is in flight.
 - **Active Task**: P1-04, mutation core, backend lane, codex at `tier_reasoning`.
