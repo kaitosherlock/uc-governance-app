@@ -27,11 +27,11 @@ REGISTRY = (
     Declaration("capabilities.read", "5", status=AVAILABLE),
     Declaration("authz.group_resolution", "8"),
     Declaration("assets.read", "7.1", status=AVAILABLE),
-    Declaration("assets.edit_metadata", "7.1"),
+    Declaration("assets.edit_metadata", "7.1", status=AVAILABLE),
     Declaration("assets.delete", "7.1"),
     Declaration("grants.read", "7.2", status=AVAILABLE),
-    Declaration("grants.update", "7.2"),
-    Declaration("ownership.transfer", "7.2"),
+    Declaration("grants.update", "7.2", status=AVAILABLE),
+    Declaration("ownership.transfer", "7.2", status=AVAILABLE),
     Declaration("principals.search", "7.2", status=AVAILABLE),
     Declaration("privileges.read", "7.2", status=AVAILABLE),
     Declaration("tags.read", "7.3", SQL),
@@ -76,16 +76,13 @@ REGISTRY = (
     Declaration("access_reviews.update", "7.12", STORE),
     Declaration("time_bound_access.update", "7.12", STORE),
     Declaration("admin.metastores", "7.1", ACCOUNT),
-    # The core and read stores are real. Concrete kinds remain honestly unavailable
-    # until their adapters are registered in P1-05 and later slices.
+    # The lifecycle and these four concrete kinds are available in fixture mode.
     Declaration("plans.lifecycle_core", "9", status=AVAILABLE),
     Declaration("plans.read", "9", status=AVAILABLE),
     Declaration("operations.read", "9", status=AVAILABLE),
-    Declaration("plans.create", "9", reason="No concrete plan kind is registered yet."),
-    Declaration("plans.execute", "9", reason="No concrete plan kind is registered yet."),
-    Declaration(
-        "operations.reconcile", "9", reason="No concrete plan kind is registered yet."
-    ),
+    Declaration("plans.create", "9", status=AVAILABLE),
+    Declaration("plans.execute", "9", status=AVAILABLE),
+    Declaration("operations.reconcile", "9", status=AVAILABLE),
 )
 
 

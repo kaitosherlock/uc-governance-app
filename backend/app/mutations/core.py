@@ -19,6 +19,7 @@ from app.errors import (
     AppError,
     DuplicateSubmission,
     ForbiddenRole,
+    ModeReadOnly,
     NotFound,
     NotImplementedYet,
     PlanExpired,
@@ -176,6 +177,8 @@ class MutationEngine:
                 mode=self.settings.mode,
             )
             if not decision.allowed:
+                if decision.reason_code == w.ErrorCode.MODE_READ_ONLY:
+                    raise ModeReadOnly(decision.reason)
                 raise ForbiddenRole(decision.reason)
 
     def _binding(self, plan: w.Plan) -> dict[str, object]:

@@ -97,6 +97,13 @@ class ReadService:
             return AllowedAction(
                 action=action, allowed=False, reason_code="ROLE_INSUFFICIENT", reason=result.reason
             )
+        if action in {
+            ActionName.GRANT,
+            ActionName.REVOKE,
+            ActionName.TRANSFER_OWNERSHIP,
+            ActionName.EDIT_METADATA,
+        }:
+            return AllowedAction(action=action, allowed=True)
         return AllowedAction(
             action=action,
             allowed=False,

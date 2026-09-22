@@ -1,0 +1,23 @@
+{
+    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T092227Z-backend-P1-05.log",
+    "tier":  "tier_reasoning",
+    "agent":  "backend",
+    "session_id":  "01a0c86c-81c1-74c0-84af-e631110173d1",
+    "finished_at":  "2026-09-22T09:40:13.7236869Z",
+    "seconds":  1066,
+    "prompt_chars":  6400,
+    "started_at":  "2026-09-22T09:22:27.8385537Z",
+    "quota_pattern":  "",
+    "model":  "gpt-5.6-terra",
+    "last_message_excerpt":  "Implemented P1-05.\n\n- Registered `grant`, `revoke`, `transfer_ownership`, and `edit_metadata` in fixture mode; connected-readonly now rejects all four with `MODE_READ_ONLY`.\n- Added fixture ownership/metadata writes and read-back verification.\n- Added validation, no-op previews, prerequisite/inheritance notes, nonempty unknown impact, JSON-safe statement previews, and typed ownership confirmation.\n- Updated action hints and only the relevant capability rows.\n- The other 17 plan kinds remain `NOT_IMPLEMENTED`.\n\nChecks passed: Ruff, Mypy (56 files), unit/API tests (172), runnable contract example/SDK-shape tests (166).\n\nFull pytest remains sandbox-blocked because it cannot read jsonschemaâ€™s installed metaschema file. Frozen-contract limitation: inherited revoke reports field error code `INHERITED_FROM_PARENT` and embeds the source route in its message; the error envelope has no `navigate_to` field.\n\nTouched backend files include [plan_kinds.py](C:/Users/admin/Downloads/uc-governance-app/backend/app/mutations/plan_kinds.py), [core.py](C:/Users/admin/Downloads/uc-governance-app/backend/app/mutations/core.py), [readers.py](C:/Users/admin/Downloads/uc-governance-app/backend/app/adapter ...[truncated]",
+    "history":  [
+                    "2026-09-22T09:22:27.8496205Z dispatched",
+                    "2026-09-22T09:40:13.7448037Z completed"
+                ],
+    "task_id":  "P1-05",
+    "status":  "completed",
+    "effort":  "high",
+    "exit_code":  0,
+    "attempt":  1,
+    "prompt_file":  ".ai/prompts/P1-05.md"
+}

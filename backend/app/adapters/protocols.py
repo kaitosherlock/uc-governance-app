@@ -4,6 +4,9 @@ from typing import Protocol
 
 from app.domain.models import AssetDetail, AssetSummary, DependenciesData, Grant, Principal
 
+# Distinguishes a missing metadata field from an explicit null comment.
+METADATA_COMMENT_UNSET = object()
+
 
 class CatalogReader(Protocol):
     def list_catalogs(

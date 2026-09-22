@@ -5,18 +5,24 @@ from app.config.settings import Settings
 from app.errors import NotImplementedYet
 
 
-def test_only_implemented_read_capabilities_available() -> None:
+def test_only_implemented_capabilities_available() -> None:
     assert {row.capability for row in REGISTRY if row.status == Status.AVAILABLE} == {
         "context.read",
         "identity.read",
         "capabilities.read",
         "assets.read",
+        "assets.edit_metadata",
         "grants.read",
+        "grants.update",
+        "ownership.transfer",
         "principals.search",
         "privileges.read",
         "plans.lifecycle_core",
         "plans.read",
         "operations.read",
+        "plans.create",
+        "plans.execute",
+        "operations.reconcile",
     }
     assert len({row.capability for row in REGISTRY}) == len(REGISTRY)
     assert all(row.domain for row in REGISTRY)

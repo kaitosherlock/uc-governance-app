@@ -1,8 +1,9 @@
 """All read protocols plus isolated grant deltas for the future plan executor."""
 
 from dataclasses import replace
-from typing import TypeVar
+from typing import TypeVar, cast
 
+from app.adapters.protocols import METADATA_COMMENT_UNSET
 from app.domain.enums import GrantSourceType, SecurableType
 from app.domain.models import (
     AssetDetail,
@@ -152,3 +153,39 @@ class FixtureReaders:
                     )
                 )
         self.grants[key] = current
+
+    def transfer_ownership(self, securable_type: str, full_name: str, new_owner: str) -> None:
+        asset = self.get_asset(securable_type, full_name)
+        person = next((p for p in self.principals if p.name == new_owner), None)
+        if person is None or not person.uc_eligible:
+            raise ValidationFailed("The new owner is not eligible for Unity Catalog ownership.")
+        self.assets[(securable_type, full_name)] = replace(asset, owner=new_owner)
+
+    def update_metadata(
+        self,
+        securable_type: str,
+        full_name: str,
+        comment: str | None | object,
+        properties: dict[str, str] | None,
+        column_comments: dict[str, str | None] | None,
+    ) -> None:
+        asset = self.get_asset(securable_type, full_name)
+        values = dict(asset.properties)
+        if properties is not None:
+            values.update(properties)
+        columns = tuple(
+            replace(column, comment=column_comments[column.name])
+            if column_comments is not None and column.name in column_comments
+            else column
+            for column in asset.columns
+        )
+        self.assets[(securable_type, full_name)] = replace(
+            asset,
+            comment=(
+                asset.comment
+                if comment is METADATA_COMMENT_UNSET
+                else cast(str | None, comment)
+            ),
+            properties=values,
+            columns=columns,
+        )
