@@ -11,7 +11,7 @@ from app.api.v1.routes_context import CurrentIdentity
 from app.config.settings import Mode
 from app.container import Container
 from app.correlation import correlation_id
-from app.domain.enums import GrantSourceType, ObjectKind, PrincipalKind, SecurableType
+from app.domain.enums import ActionName, GrantSourceType, ObjectKind, PrincipalKind, SecurableType
 from app.domain.models import AssetSummary
 from app.domain.names import parts, target_parts
 from app.domain.privileges import catalogue
@@ -192,6 +192,62 @@ def get_asset(
         success=True,
         data=mappers.map_AssetDetail(value),
         meta=meta(request, svc, bits[0], bits[1] if len(bits) > 1 else None, limitations=notes),
+    )
+
+
+@router.get(
+    "/assets/TABLE/{full_name}/row-access",
+    response_model=w.RowAccessResponse,
+    operation_id="getRowAccessControls",
+    responses=responses(401, 403, 404, 500, 503),
+)
+def get_row_access_controls(full_name: str, request: Request, svc: Service) -> w.RowAccessResponse:
+    asset = svc.row_access(full_name)
+    bits = target_parts("TABLE", full_name)
+    actions = [
+        svc.action(ActionName.SET_ROW_FILTER, bits[0]),
+        svc.action(ActionName.DROP_ROW_FILTER, bits[0]),
+        svc.action(ActionName.SET_COLUMN_MASK, bits[0]),
+        svc.action(ActionName.DROP_COLUMN_MASK, bits[0]),
+    ]
+    masks = [column.mask for column in asset.columns if column.mask is not None]
+    limitations = [
+        "The SDK metadata does not identify whether an attached control is direct or ABAC-derived; "
+        "unknown attachment source is shown as unavailable rather than inferred."
+    ]
+    if svc.settings.mode == Mode.FIXTURE:
+        limitations = ["All data is synthetic."]
+    return w.RowAccessResponse(
+        success=True,
+        data=w.RowAccessData(
+            target=mappers.map_AssetRef(asset),
+            row_filter=mappers.map_RowFilterRef(asset.row_filter)
+            if asset.row_filter is not None
+            else None,
+            column_masks=[mappers.map_ColumnMaskRef(mask) for mask in masks],
+            allowed_actions=[mappers.map_AllowedAction(action) for action in actions],
+        ),
+        meta=meta(request, svc, bits[0], bits[1], limitations=limitations),
+    )
+
+
+@router.get(
+    "/functions/{full_name}",
+    response_model=w.FunctionDetailResponse,
+    operation_id="getFunction",
+    responses=responses(401, 403, 404, 500, 503),
+)
+def get_function(full_name: str, request: Request, svc: Service) -> w.FunctionDetailResponse:
+    value = svc.function(full_name)
+    bits = target_parts("FUNCTION", full_name)
+    limitations = [
+        "Dependencies are limited to the function metadata returned by Databricks; reverse "
+        "dependents and fields absent from the SDK response are unavailable."
+    ]
+    return w.FunctionDetailResponse(
+        success=True,
+        data=mappers.map_FunctionDetail(value),
+        meta=meta(request, svc, bits[0], bits[1], limitations=limitations, partial=True),
     )
 
 
@@ -381,9 +437,7 @@ def preview_abac_policy_impact(
     operation_id="getAbacPolicy",
     responses=responses(401, 403, 404, 500, 501),
 )
-def get_abac_policy(
-    policy_id: str, request: Request, svc: Service
-) -> w.AbacPolicyResponse:
+def get_abac_policy(policy_id: str, request: Request, svc: Service) -> w.AbacPolicyResponse:
     value = svc.abac_policy(policy_id)
     return w.AbacPolicyResponse(
         success=True,

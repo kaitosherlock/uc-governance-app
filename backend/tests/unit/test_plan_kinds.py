@@ -362,10 +362,125 @@ def test_readonly_mode_rejects_each_registered_kind_before_any_write(
             policy_id="fixture-policy-sales-sensitive-rows"
         ),
         w.PlanKind.DELETE_ABAC_POLICY: {"policy_id": "fixture-policy-sales-sensitive-rows"},
+        w.PlanKind.SET_ROW_FILTER: {
+            "function_full_name": "shared_ref.governance.normalize_id",
+            "input_columns": ["id"],
+        },
+        w.PlanKind.DROP_ROW_FILTER: {},
+        w.PlanKind.SET_COLUMN_MASK: {
+            "column": "email",
+            "function_full_name": "shared_ref.governance.mask_email",
+            "using_columns": [],
+        },
+        w.PlanKind.DROP_COLUMN_MASK: {"column": "email"},
     }
     for kind, payload in changes.items():
         with pytest.raises(ModeReadOnly):
             engine.build(request(kind, payload), identity())
+
+
+def filter_request(kind: w.PlanKind, changes: dict[str, object]) -> w.PlanCreateRequest:
+    return request(kind, changes, "sales.crm.customers")
+
+
+def test_filter_and_mask_plan_kinds_write_and_read_back() -> None:
+    cases = [
+        (
+            w.PlanKind.SET_ROW_FILTER,
+            {"function_full_name": "shared_ref.governance.normalize_id", "input_columns": ["id"]},
+        ),
+        (w.PlanKind.DROP_ROW_FILTER, {}),
+        (
+            w.PlanKind.SET_COLUMN_MASK,
+            {
+                "column": "email",
+                "function_full_name": "shared_ref.governance.mask_email",
+                "using_columns": [],
+            },
+        ),
+        (w.PlanKind.DROP_COLUMN_MASK, {"column": "email"}),
+    ]
+    for kind, changes in cases:
+        engine = fixture_engine()
+        plan = engine.build(filter_request(kind, changes), identity())
+        assert plan.requires_typed_confirmation is True
+        operation = engine.execute(
+            plan.id,
+            w.PlanExecuteRequest(
+                confirmation_token=plan.confirmation_token,
+                typed_name="sales.crm.customers",
+            ),
+            identity(),
+            "fixture-correlation",
+        )
+        assert operation.targets[0].verified is True
+
+
+def test_filter_signature_mismatch_names_argument() -> None:
+    with pytest.raises(ValidationFailed) as raised:
+        fixture_engine().build(
+            filter_request(
+                w.PlanKind.SET_ROW_FILTER,
+                {"function_full_name": "shared_ref.governance.mask_email", "input_columns": ["id"]},
+            ),
+            identity(),
+        )
+
+    assert raised.value.errors[0].code == "ARGUMENT_TYPE"
+    assert "Argument 1 ('id')" in raised.value.message
+
+
+def test_drop_filter_exposure_preview_and_unknown_audience_are_explicit() -> None:
+    plan = fixture_engine().build(filter_request(w.PlanKind.DROP_ROW_FILTER, {}), identity())
+
+    assert plan.requires_typed_confirmation is True
+    assert "may become visible" in plan.impact.known[0]
+    assert any("cannot enumerate" in item for item in plan.impact.unknown)
+    assert any("No query was run" in item for item in plan.impact.unknown)
+
+
+def test_filter_state_change_after_preview_is_stale() -> None:
+    engine = fixture_engine()
+    plan = engine.build(
+        filter_request(w.PlanKind.DROP_COLUMN_MASK, {"column": "email"}), identity()
+    )
+    adapter = engine.registry.get(w.PlanKind.DROP_COLUMN_MASK).adapter  # type: ignore[attr-defined]
+    adapter.update_column_mask("sales.crm.customers", "email", None, ())
+
+    with pytest.raises(PlanStale):
+        engine.execute(
+            plan.id,
+            w.PlanExecuteRequest(
+                confirmation_token=plan.confirmation_token,
+                typed_name="sales.crm.customers",
+            ),
+            identity(),
+            "fixture-correlation",
+        )
+
+
+def test_filter_sql_identifier_template_quotes_a_crafted_identifier() -> None:
+    adapter = FixtureReaders()
+    crafted = 'sales.crm.`customers"; DROP TABLE grants; --`'
+    original = adapter.get_asset("TABLE", "sales.crm.customers")
+    adapter.assets[("TABLE", crafted)] = replace(
+        original, full_name=crafted, row_filter=None
+    )
+    registry = PlanKindRegistry()
+    for handler in register_fixture_plan_kinds(adapter, tuple(APPLICABILITY)):
+        registry.register(handler)
+    plan = MutationEngine(Settings(mode=Mode.FIXTURE), registry).build(
+        request(
+            w.PlanKind.SET_ROW_FILTER,
+            {"function_full_name": "shared_ref.governance.normalize_id", "input_columns": ["id"]},
+            crafted,
+        ),
+        identity(),
+    )
+
+    preview = plan.normalized_changes[0].statement_preview
+    assert '`customers"; DROP TABLE grants; --`' in preview
+    assert "ALTER TABLE `sales`.`crm`." in preview
 
 
 def test_system_tag_preview_uses_the_read_policy_refusal() -> None:

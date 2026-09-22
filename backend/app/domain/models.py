@@ -117,6 +117,26 @@ class ColumnMaskRef:
 
 
 @dataclass(frozen=True, kw_only=True)
+class FunctionParameter:
+    name: str
+    type_text: str
+    position: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class FunctionDetail:
+    full_name: str
+    owner: str | None
+    comment: str | None
+    return_type: str | None
+    parameters: tuple[FunctionParameter, ...]
+    language: str | None
+    dependents: tuple["Dependency", ...]
+    used_as_policy_function: bool | None
+    allowed_actions: tuple[AllowedAction, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
 class Column:
     name: str
     type_text: str

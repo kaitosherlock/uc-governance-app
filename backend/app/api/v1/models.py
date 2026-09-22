@@ -445,6 +445,39 @@ class PolicyImpactResponse(SuccessResponse[PolicyImpactData]):
     pass
 
 
+class RowAccessData(ContractModel):
+    target: AssetRef
+    row_filter: RowFilterRef | None
+    column_masks: list[ColumnMaskRef]
+    allowed_actions: list[AllowedAction]
+
+
+class RowAccessResponse(SuccessResponse[RowAccessData]):
+    pass
+
+
+class FunctionParameter(ContractModel):
+    name: str
+    type_text: str
+    position: int
+
+
+class FunctionDetail(ContractModel):
+    full_name: str
+    owner: str | None
+    comment: str | None
+    return_type: str | None
+    parameters: list[FunctionParameter]
+    language: str | None
+    dependents: list[Dependency]
+    used_as_policy_function: bool | None
+    allowed_actions: list[AllowedAction]
+
+
+class FunctionDetailResponse(SuccessResponse[FunctionDetail]):
+    pass
+
+
 class PlanKind(StrEnum):
     GRANT = "grant"
     REVOKE = "revoke"

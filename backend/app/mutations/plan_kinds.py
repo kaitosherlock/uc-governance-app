@@ -29,7 +29,10 @@ from app.domain.models import (
     AssetDetail,
     AssetRef,
     AssetSummary,
+    ColumnMaskRef,
+    FunctionDetail,
     Grant,
+    RowFilterRef,
     Tag,
     TagPolicy,
 )
@@ -37,6 +40,7 @@ from app.domain.names import access_route, parts
 from app.domain.privileges import APPLICABILITY
 from app.domain.reads import ReadPolicy
 from app.errors import NotImplementedYet, ValidationFailed
+from app.mutations import sql_templates
 from app.mutations.core import MutationWriteResult, PlanKindHandler, Preview
 
 
@@ -78,6 +82,20 @@ class MutationAdapter(AssetReader, GrantReader, GrantWriter, PrincipalReader, Ta
     def update_abac_policy(self, policy_id: str, value: AbacPolicy) -> None: ...
 
     def delete_abac_policy(self, policy_id: str) -> None: ...
+
+    def get_function(self, full_name: str) -> FunctionDetail: ...
+
+    def update_row_filter(
+        self, full_name: str, function_full_name: str | None, input_columns: tuple[str, ...]
+    ) -> None: ...
+
+    def update_column_mask(
+        self,
+        full_name: str,
+        column: str,
+        function_full_name: str | None,
+        using_columns: tuple[str, ...],
+    ) -> None: ...
 
 
 def _field_error(field: str, code: str, message: str) -> ValidationFailed:
@@ -121,6 +139,13 @@ class _TagChange:
 class _TagChanges:
     column: str | None
     tags: tuple[_TagChange, ...]
+
+
+@dataclass(frozen=True)
+class _ControlChanges:
+    column: str | None
+    function_full_name: str | None
+    input_columns: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -324,6 +349,158 @@ class FixturePlanKindHandler(PlanKindHandler):
         return _TagChanges(column=column, tags=tuple(parsed))
 
     @staticmethod
+    def _control_asset(asset: AssetDetail) -> None:
+        if asset.securable_type != SecurableType.TABLE or asset.kind not in {
+            ObjectKind.TABLE,
+            ObjectKind.MATERIALIZED_VIEW,
+            ObjectKind.STREAMING_TABLE,
+        }:
+            raise _field_error(
+                "targets",
+                "UNSUPPORTED_FOR_TYPE",
+                "Direct row filters and column masks are supported only for UC tables, "
+                "materialized views, and streaming tables.",
+            )
+        if asset.pipeline_managed:
+            raise _field_error(
+                "targets",
+                "UNSUPPORTED_COMPUTE",
+                "Pipeline-managed tables must be changed through their pipeline definition; "
+                "this direct SQL control is not supported.",
+            )
+
+    @staticmethod
+    def _type_matches(column_type: str, parameter_type: str) -> bool:
+        return " ".join(column_type.upper().split()) == " ".join(parameter_type.upper().split())
+
+    def _validate_signature(
+        self,
+        function_full_name: str,
+        columns: tuple[str, ...],
+        asset: AssetDetail,
+        *,
+        row_filter: bool,
+    ) -> None:
+        function = self.adapter.get_function(function_full_name)
+        parameters = function.parameters
+        if len(parameters) != len(columns):
+            raise _field_error(
+                "changes.input_columns" if row_filter else "changes.using_columns",
+                "ARGUMENT_COUNT",
+                f"Function '{function_full_name}' expects {len(parameters)} argument(s), but "
+                f"{len(columns)} column argument(s) were supplied.",
+            )
+        available = {column.name: column for column in asset.columns}
+        for index, (name, parameter) in enumerate(zip(columns, parameters, strict=True), start=1):
+            column = available[name]
+            if not self._type_matches(column.type_text, parameter.type_text):
+                raise _field_error(
+                    "changes.input_columns" if row_filter else "changes.using_columns",
+                    "ARGUMENT_TYPE",
+                    f"Argument {index} ('{name}') is {column.type_text}, but function parameter "
+                    f"'{parameter.name}' requires {parameter.type_text}.",
+                )
+        if row_filter:
+            if function.return_type is None or not self._type_matches(
+                function.return_type, "BOOLEAN"
+            ):
+                raise _field_error(
+                    "changes.function_full_name",
+                    "RETURN_TYPE",
+                    f"Row-filter function '{function_full_name}' must return BOOLEAN.",
+                )
+        elif function.return_type is None or not self._type_matches(
+            function.return_type, available[columns[0]].type_text
+        ):
+            raise _field_error(
+                "changes.function_full_name",
+                "RETURN_TYPE",
+                f"Column-mask function '{function_full_name}' must return "
+                f"{available[columns[0]].type_text} for its masked column.",
+            )
+
+    def _control_changes(self, changes: dict[str, object], asset: AssetDetail) -> _ControlChanges:
+        self._control_asset(asset)
+        is_row = self.kind in {w.PlanKind.SET_ROW_FILTER, w.PlanKind.DROP_ROW_FILTER}
+        is_set = self.kind in {w.PlanKind.SET_ROW_FILTER, w.PlanKind.SET_COLUMN_MASK}
+        if not is_set:
+            expected = set() if is_row else {"column"}
+            if set(changes) != expected:
+                raise _field_error("changes", "INVALID", "Drop changes contain unsupported fields.")
+            column = None if is_row else _string(changes.get("column"), "changes.column")
+            if column is not None and not any(item.name == column for item in asset.columns):
+                raise _field_error(
+                    "changes.column", "NOT_FOUND", f"Column '{column}' does not exist."
+                )
+            return _ControlChanges(column=column, function_full_name=None, input_columns=())
+
+        expected = (
+            {"function_full_name", "input_columns"}
+            if is_row
+            else {"column", "function_full_name", "using_columns"}
+        )
+        if set(changes) != expected:
+            raise _field_error("changes", "INVALID", "Set changes contain unsupported fields.")
+        function = _string(changes.get("function_full_name"), "changes.function_full_name")
+        column = None if is_row else _string(changes.get("column"), "changes.column")
+        raw_inputs = changes.get("input_columns" if is_row else "using_columns")
+        if not isinstance(raw_inputs, list) or any(
+            not isinstance(item, str) or not item for item in raw_inputs
+        ):
+            raise _field_error(
+                "changes.input_columns" if is_row else "changes.using_columns",
+                "INVALID",
+                "Input columns must be an array of non-empty column names.",
+            )
+        inputs = tuple(raw_inputs)
+        if len(set(inputs)) != len(inputs):
+            raise _field_error(
+                "changes.input_columns" if is_row else "changes.using_columns",
+                "DUPLICATE",
+                "Each input column may appear only once.",
+            )
+        available = {item.name for item in asset.columns}
+        if column is not None:
+            if column not in available:
+                raise _field_error(
+                    "changes.column", "NOT_FOUND", f"Column '{column}' does not exist."
+                )
+            inputs = (column, *inputs)
+        missing = next((item for item in inputs if item not in available), None)
+        if missing is not None:
+            raise _field_error(
+                "changes.input_columns" if is_row else "changes.using_columns",
+                "NOT_FOUND",
+                f"Column '{missing}' does not exist on '{asset.full_name}'.",
+            )
+        self._validate_signature(function, inputs, asset, row_filter=is_row)
+        return _ControlChanges(column=column, function_full_name=function, input_columns=inputs)
+
+    @staticmethod
+    def _attached_control(
+        asset: AssetDetail, changes: _ControlChanges, row: bool
+    ) -> RowFilterRef | ColumnMaskRef | None:
+        if row:
+            return asset.row_filter
+        return next(item.mask for item in asset.columns if item.name == changes.column)
+
+    def _control_statement(self, target: w.AssetRef, change: _ControlChanges) -> str:
+        if self.kind == w.PlanKind.SET_ROW_FILTER:
+            return sql_templates.set_row_filter(
+                target.full_name, change.function_full_name or "", change.input_columns
+            )
+        if self.kind == w.PlanKind.DROP_ROW_FILTER:
+            return sql_templates.drop_row_filter(target.full_name)
+        if self.kind == w.PlanKind.SET_COLUMN_MASK:
+            return sql_templates.set_column_mask(
+                target.full_name,
+                change.column or "",
+                change.function_full_name or "",
+                change.input_columns[1:],
+            )
+        return sql_templates.drop_column_mask(target.full_name, change.column or "")
+
+    @staticmethod
     def _tags_at(asset: AssetDetail, column: str | None) -> tuple[Tag, ...]:
         if column is None:
             return asset.tags
@@ -471,8 +648,10 @@ class FixturePlanKindHandler(PlanKindHandler):
 
         def principals(field: str, required: bool) -> tuple[str, ...]:
             raw = changes.get(field)
-            if not isinstance(raw, list) or (required and not raw) or any(
-                not isinstance(item, str) for item in raw
+            if (
+                not isinstance(raw, list)
+                or (required and not raw)
+                or any(not isinstance(item, str) for item in raw)
             ):
                 wording = "at least one principal" if required else "only principal names"
                 raise _field_error(field, "INVALID", f"{field} must contain {wording}.")
@@ -660,6 +839,29 @@ class FixturePlanKindHandler(PlanKindHandler):
                     for column in asset.columns
                     if column.tags
                 },
+                "row_filter": (
+                    None
+                    if asset.row_filter is None
+                    else (
+                        asset.row_filter.function_full_name,
+                        asset.row_filter.input_columns,
+                        asset.row_filter.attached_via.value,
+                        asset.row_filter.policy_id,
+                    )
+                ),
+                "column_masks": {
+                    column.name: (
+                        None
+                        if column.mask is None
+                        else (
+                            column.mask.function_full_name,
+                            column.mask.using_columns,
+                            column.mask.attached_via.value,
+                            column.mask.policy_id,
+                        )
+                    )
+                    for column in asset.columns
+                },
             },
             "direct": self._grants_state(direct),
             "effective": self._grants_state(effective),
@@ -740,6 +942,12 @@ class FixturePlanKindHandler(PlanKindHandler):
         ]
         prerequisites: list[str] = []
         inheritance: str | None = None
+        requires_typed_confirmation = self.kind in {
+            w.PlanKind.TRANSFER_OWNERSHIP,
+            w.PlanKind.DELETE_ABAC_POLICY,
+            w.PlanKind.DROP_ROW_FILTER,
+            w.PlanKind.DROP_COLUMN_MASK,
+        }
         for requested in request.targets:
             target, asset = self._asset(requested)
             targets.append(target)
@@ -948,6 +1156,75 @@ class FixturePlanKindHandler(PlanKindHandler):
                             "execution simulates the requested change only."
                         )
             elif self.kind in {
+                w.PlanKind.SET_ROW_FILTER,
+                w.PlanKind.DROP_ROW_FILTER,
+                w.PlanKind.SET_COLUMN_MASK,
+                w.PlanKind.DROP_COLUMN_MASK,
+            }:
+                control = self._control_changes(request.changes, asset)
+                row = self.kind in {w.PlanKind.SET_ROW_FILTER, w.PlanKind.DROP_ROW_FILTER}
+                existing = self._attached_control(asset, control, row)
+                if existing is not None and existing.attached_via.value == "abac_policy":
+                    raise _field_error(
+                        "targets",
+                        "ABAC_DERIVED",
+                        "This control is applied by an ABAC policy and cannot be changed on the "
+                        "table. Change policy '"
+                        + (existing.policy_id or "Unavailable")
+                        + "' instead.",
+                    )
+                verb = "row filter" if row else f"mask on column `{control.column}`"
+                dropping = self.kind in {
+                    w.PlanKind.DROP_ROW_FILTER,
+                    w.PlanKind.DROP_COLUMN_MASK,
+                }
+                replacing = (
+                    self.kind in {w.PlanKind.SET_ROW_FILTER, w.PlanKind.SET_COLUMN_MASK}
+                    and existing is not None
+                )
+                requires_typed_confirmation = requires_typed_confirmation or replacing
+                if dropping:
+                    description = f"Drop the direct {verb} from `{target.full_name}`."
+                    known.append(
+                        f"Rows or values currently hidden by this direct {verb} may become visible "
+                        "to identities that can query the table."
+                    )
+                elif replacing:
+                    description = f"Replace the direct {verb} on `{target.full_name}`."
+                    known.append(
+                        f"Replacing the existing direct {verb} can expose rows or original values "
+                        "that the current control hides."
+                    )
+                else:
+                    description = f"Set a direct {verb} on `{target.full_name}`."
+                    known.append(
+                        f"Future queries will receive the direct {verb} defined by the selected "
+                        "function; this application did not execute it against data."
+                    )
+                normalized.append(
+                    w.NormalizedChange(
+                        target=target,
+                        description=description,
+                        statement_preview=self._control_statement(target, control),
+                    )
+                )
+                if dropping or replacing:
+                    unknown.append(
+                        "The application cannot enumerate which users, groups, service principals,"
+                        " or downstream queries gain visibility; group membership and "
+                        "effective access "
+                        "were not evaluated."
+                    )
+                unknown.append(
+                    "No query was run and this preview does not test the filter or mask against "
+                    "real data."
+                )
+                prerequisites.append(
+                    "Requires a Unity Catalog SQL UDF, EXECUTE on that function, USE CATALOG and "
+                    "USE SCHEMA, and compatible Databricks SQL or Runtime compute "
+                    "(12.2 LTS or later)."
+                )
+            elif self.kind in {
                 w.PlanKind.CREATE_ABAC_POLICY,
                 w.PlanKind.UPDATE_ABAC_POLICY,
                 w.PlanKind.DELETE_ABAC_POLICY,
@@ -1014,11 +1291,8 @@ class FixturePlanKindHandler(PlanKindHandler):
             impact=w.Impact(known=known, unknown=unknown),
             prerequisite_notes=tuple(dict.fromkeys(prerequisites)),
             inheritance_note=inheritance,
-            requires_typed_confirmation=self.kind
-            in {w.PlanKind.TRANSFER_OWNERSHIP, w.PlanKind.DELETE_ABAC_POLICY},
-            typed_confirmation_value=targets[0].full_name
-            if self.kind in {w.PlanKind.TRANSFER_OWNERSHIP, w.PlanKind.DELETE_ABAC_POLICY}
-            else None,
+            requires_typed_confirmation=requires_typed_confirmation,
+            typed_confirmation_value=targets[0].full_name if requires_typed_confirmation else None,
         )
 
     def observe(self, target: w.AssetRef) -> object:
@@ -1097,6 +1371,39 @@ class FixturePlanKindHandler(PlanKindHandler):
             )
             return MutationWriteResult(status="applied", summary="Tag changes were sent.")
         if self.kind in {
+            w.PlanKind.SET_ROW_FILTER,
+            w.PlanKind.DROP_ROW_FILTER,
+            w.PlanKind.SET_COLUMN_MASK,
+            w.PlanKind.DROP_COLUMN_MASK,
+        }:
+            asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
+            control = self._control_changes(changes, asset)
+            row = self.kind in {w.PlanKind.SET_ROW_FILTER, w.PlanKind.DROP_ROW_FILTER}
+            existing = self._attached_control(asset, control, row)
+            if existing is not None and existing.attached_via.value == "abac_policy":
+                raise _field_error(
+                    "targets",
+                    "ABAC_DERIVED",
+                    "This centrally applied ABAC control must be changed through its policy.",
+                )
+            if row:
+                self.adapter.update_row_filter(
+                    target.full_name,
+                    control.function_full_name,
+                    control.input_columns,
+                )
+            else:
+                self.adapter.update_column_mask(
+                    target.full_name,
+                    control.column or "",
+                    control.function_full_name,
+                    control.input_columns[1:] if control.function_full_name else (),
+                )
+            return MutationWriteResult(
+                status="applied",
+                summary="Direct row-access control change was sent and will be read back.",
+            )
+        if self.kind in {
             w.PlanKind.CREATE_ABAC_POLICY,
             w.PlanKind.UPDATE_ABAC_POLICY,
             w.PlanKind.DELETE_ABAC_POLICY,
@@ -1152,6 +1459,31 @@ class FixturePlanKindHandler(PlanKindHandler):
                 )
             return all(change.key not in current for change in tag_delta.tags)
         if self.kind in {
+            w.PlanKind.SET_ROW_FILTER,
+            w.PlanKind.DROP_ROW_FILTER,
+            w.PlanKind.SET_COLUMN_MASK,
+            w.PlanKind.DROP_COLUMN_MASK,
+        }:
+            asset = self.adapter.get_asset(target.securable_type.value, target.full_name)
+            control = self._control_changes(changes, asset)
+            row = self.kind in {w.PlanKind.SET_ROW_FILTER, w.PlanKind.DROP_ROW_FILTER}
+            control_current = self._attached_control(asset, control, row)
+            if self.kind in {w.PlanKind.DROP_ROW_FILTER, w.PlanKind.DROP_COLUMN_MASK}:
+                return control_current is None
+            if row:
+                return (
+                    isinstance(control_current, RowFilterRef)
+                    and control_current.function_full_name == control.function_full_name
+                    and control_current.input_columns == control.input_columns
+                    and control_current.attached_via.value == "direct"
+                )
+            return (
+                isinstance(control_current, ColumnMaskRef)
+                and control_current.function_full_name == control.function_full_name
+                and control_current.using_columns == control.input_columns[1:]
+                and control_current.attached_via.value == "direct"
+            )
+        if self.kind in {
             w.PlanKind.CREATE_ABAC_POLICY,
             w.PlanKind.UPDATE_ABAC_POLICY,
             w.PlanKind.DELETE_ABAC_POLICY,
@@ -1193,6 +1525,10 @@ def register_fixture_plan_kinds(
             w.PlanKind.CREATE_ABAC_POLICY,
             w.PlanKind.UPDATE_ABAC_POLICY,
             w.PlanKind.DELETE_ABAC_POLICY,
+            w.PlanKind.SET_ROW_FILTER,
+            w.PlanKind.DROP_ROW_FILTER,
+            w.PlanKind.SET_COLUMN_MASK,
+            w.PlanKind.DROP_COLUMN_MASK,
         )
     )
 
@@ -1210,5 +1546,9 @@ def register_connected_readonly_plan_kinds() -> tuple[RegisteredPlanKind, ...]:
             w.PlanKind.CREATE_ABAC_POLICY,
             w.PlanKind.UPDATE_ABAC_POLICY,
             w.PlanKind.DELETE_ABAC_POLICY,
+            w.PlanKind.SET_ROW_FILTER,
+            w.PlanKind.DROP_ROW_FILTER,
+            w.PlanKind.SET_COLUMN_MASK,
+            w.PlanKind.DROP_COLUMN_MASK,
         )
     )

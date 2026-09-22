@@ -6,15 +6,20 @@ from datetime import UTC, datetime
 from typing import TypeVar, cast
 
 from app.adapters.protocols import METADATA_COMMENT_UNSET
-from app.domain.enums import GrantSourceType, SecurableType
+from app.domain.enums import AttachmentSource, DependencyKind, GrantSourceType, SecurableType
 from app.domain.models import (
     AbacPolicy,
     AssetDetail,
     AssetSummary,
+    ColumnMaskRef,
     DependenciesData,
+    Dependency,
+    FunctionDetail,
+    FunctionParameter,
     Grant,
     GrantSource,
     Principal,
+    RowFilterRef,
     Tag,
     TagPolicy,
 )
@@ -29,9 +34,7 @@ from app.fixtures_data.dataset import (
 )
 
 _HAS_TAG = re.compile(r"^has_tag\('([A-Za-z0-9_.-]+)'\)$")
-_HAS_TAG_VALUE = re.compile(
-    r"^has_tag_value\('([A-Za-z0-9_.-]+)',\s*'([^']+)'\)$"
-)
+_HAS_TAG_VALUE = re.compile(r"^has_tag_value\('([A-Za-z0-9_.-]+)',\s*'([^']+)'\)$")
 
 T = TypeVar("T")
 
@@ -95,6 +98,58 @@ class FixtureReaders:
         if result is None:
             raise NotFound()
         return result
+
+    def get_function(self, full_name: str) -> FunctionDetail:
+        self.get_asset("FUNCTION", full_name)
+        if full_name == "shared_ref.governance.normalize_id":
+            return FunctionDetail(
+                full_name=full_name,
+                owner="shared_ref-owners",
+                comment="Synthetic row filter predicate.",
+                return_type="BOOLEAN",
+                parameters=(FunctionParameter(name="id", type_text="BIGINT", position=0),),
+                language="SQL",
+                dependents=(
+                    Dependency(
+                        kind=DependencyKind.DOWNSTREAM_TABLE,
+                        full_name="sales.crm.orders",
+                        source="fixture",
+                        verified=True,
+                    ),
+                ),
+                used_as_policy_function=True,
+                allowed_actions=(),
+            )
+        if full_name == "shared_ref.governance.mask_email":
+            return FunctionDetail(
+                full_name=full_name,
+                owner="shared_ref-owners",
+                comment="Synthetic email redaction function.",
+                return_type="STRING",
+                parameters=(FunctionParameter(name="email", type_text="STRING", position=0),),
+                language="SQL",
+                dependents=(
+                    Dependency(
+                        kind=DependencyKind.DOWNSTREAM_TABLE,
+                        full_name="sales.crm.customers",
+                        source="fixture",
+                        verified=True,
+                    ),
+                ),
+                used_as_policy_function=True,
+                allowed_actions=(),
+            )
+        return FunctionDetail(
+            full_name=full_name,
+            owner=None,
+            comment=None,
+            return_type=None,
+            parameters=(),
+            language=None,
+            dependents=(),
+            used_as_policy_function=None,
+            allowed_actions=(),
+        )
 
     def direct_grants(
         self, securable_type: str, full_name: str, page_size: int, page_token: str | None
@@ -184,8 +239,10 @@ class FixtureReaders:
         details = asset if isinstance(asset, AssetDetail) else None
         if details is None:
             return False
-        tags = details.tags if policy.policy_type == "row_filter" else tuple(
-            tag for column in details.columns for tag in column.tags
+        tags = (
+            details.tags
+            if policy.policy_type == "row_filter"
+            else tuple(tag for column in details.columns for tag in column.tags)
         )
         return any(tag.key == key and (expected is None or tag.value == expected) for tag in tags)
 
@@ -330,4 +387,53 @@ class FixtureReaders:
             ),
             properties=values,
             columns=columns,
+        )
+
+    def update_row_filter(
+        self, full_name: str, function_full_name: str | None, input_columns: tuple[str, ...]
+    ) -> None:
+        asset = self.get_asset("TABLE", full_name)
+        self.assets[("TABLE", full_name)] = replace(
+            asset,
+            row_filter=(
+                None
+                if function_full_name is None
+                else RowFilterRef(
+                    function_full_name=function_full_name,
+                    input_columns=input_columns,
+                    attached_via=AttachmentSource.DIRECT,
+                )
+            ),
+        )
+
+    def update_column_mask(
+        self,
+        full_name: str,
+        column: str,
+        function_full_name: str | None,
+        using_columns: tuple[str, ...],
+    ) -> None:
+        asset = self.get_asset("TABLE", full_name)
+        if not any(item.name == column for item in asset.columns):
+            raise ValidationFailed(f"Column '{column}' does not exist on '{full_name}'.")
+        self.assets[("TABLE", full_name)] = replace(
+            asset,
+            columns=tuple(
+                replace(
+                    item,
+                    mask=(
+                        None
+                        if function_full_name is None
+                        else ColumnMaskRef(
+                            column=column,
+                            function_full_name=function_full_name,
+                            using_columns=using_columns,
+                            attached_via=AttachmentSource.DIRECT,
+                        )
+                    ),
+                )
+                if item.name == column
+                else item
+                for item in asset.columns
+            ),
         )

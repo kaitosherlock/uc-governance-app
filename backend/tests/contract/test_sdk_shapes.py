@@ -272,7 +272,36 @@ DTO_FIELDS = {
             "view_definition",
             "view_dependencies",
         ),
-        "databricks.sdk.service.catalog.ColumnInfo": ("name", "comment", "mask", "type_name"),
+        "databricks.sdk.service.catalog.ColumnInfo": (
+            "name",
+            "comment",
+            "mask",
+            "type_name",
+            "type_text",
+        ),
+        "databricks.sdk.service.catalog.TableRowFilter": (
+            "function_name",
+            "input_column_names",
+            "input_arguments",
+        ),
+        "databricks.sdk.service.catalog.ColumnMask": (
+            "function_name",
+            "using_column_names",
+            "using_arguments",
+        ),
+    },
+    ("functions", "get"): {
+        "databricks.sdk.service.catalog.FunctionInfo": (
+            "full_name",
+            "owner",
+            "comment",
+            "full_data_type",
+            "input_params",
+            "external_language",
+            "routine_dependencies",
+        ),
+        "databricks.sdk.service.catalog.FunctionParameterInfo": ("name", "type_text", "position"),
+        "databricks.sdk.service.catalog.DependencyList": ("dependencies",),
     },
     ("grants", "get_effective"): {
         "databricks.sdk.service.catalog.EffectivePrivilege": (

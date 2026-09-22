@@ -6,6 +6,7 @@ from app.adapters.protocols import (
     AssetReader,
     CatalogReader,
     DependencyReader,
+    FunctionReader,
     GrantReader,
     ObjectReader,
     PolicyReader,
@@ -22,6 +23,7 @@ from app.domain.models import (
     AllowedAction,
     AssetDetail,
     AssetSummary,
+    FunctionDetail,
     Grant,
     GrantsData,
     Tag,
@@ -44,6 +46,7 @@ class Readers:
     grants: GrantReader
     principals: PrincipalReader
     dependencies: DependencyReader
+    functions: FunctionReader
     tags: TagReader
     policies: PolicyReader
     privilege_codes: tuple[str, ...]
@@ -135,6 +138,10 @@ class ReadService:
             ActionName.EDIT_METADATA,
             ActionName.ASSIGN_TAG,
             ActionName.REMOVE_TAG,
+            ActionName.SET_ROW_FILTER,
+            ActionName.DROP_ROW_FILTER,
+            ActionName.SET_COLUMN_MASK,
+            ActionName.DROP_COLUMN_MASK,
         }:
             return AllowedAction(action=action, allowed=True)
         return AllowedAction(
@@ -256,6 +263,19 @@ class ReadService:
         ):
             raise ForbiddenScope("Policy scope is outside the managed scope.")
         return policy, visible, unknown
+
+    def row_access(self, name: str) -> AssetDetail:
+        catalog = self.catalog_for("TABLE", name)
+        self.authorize("filters.read", catalog)
+        asset = self.readers.assets.get_asset("TABLE", name)
+        if asset.securable_type.value != "TABLE":
+            raise AppError(ErrorCode.NOT_FOUND, "The requested table was not found.", 404)
+        return asset
+
+    def function(self, name: str) -> FunctionDetail:
+        catalog = self.catalog_for("FUNCTION", name)
+        self.authorize("filters.read", catalog)
+        return self.readers.functions.get_function(name)
 
     def explain(self, grant: Grant, catalog: str | None) -> Grant:
         if grant.source.type == GrantSourceType.INHERITED:

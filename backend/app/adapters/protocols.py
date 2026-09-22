@@ -7,6 +7,7 @@ from app.domain.models import (
     AssetDetail,
     AssetSummary,
     DependenciesData,
+    FunctionDetail,
     Grant,
     Principal,
     Tag,
@@ -89,3 +90,7 @@ class PolicyReader(Protocol):
     def abac_policy_impact(
         self, policy_id: str, page_size: int
     ) -> tuple[list[AssetSummary], tuple[str, ...]]: ...
+
+
+class FunctionReader(Protocol):
+    def get_function(self, full_name: str) -> FunctionDetail: ...

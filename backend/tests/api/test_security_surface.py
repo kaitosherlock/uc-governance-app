@@ -27,6 +27,8 @@ READ_CALLS: dict[str, tuple[str, str]] = {
     "getAssetDependencies": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/dependencies"),
     "getGrants": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/grants"),
     "getTags": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/tags"),
+    "getRowAccessControls": ("GET", "/api/v1/assets/TABLE/sales.crm.orders/row-access"),
+    "getFunction": ("GET", "/api/v1/functions/shared_ref.governance.normalize_id"),
     "listTagPolicies": ("GET", "/api/v1/tag-policies"),
     "listAbacPolicies": ("GET", "/api/v1/abac-policies"),
     "getAbacPolicy": ("GET", "/api/v1/abac-policies/fixture-policy-sales-sensitive-rows"),

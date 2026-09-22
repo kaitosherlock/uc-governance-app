@@ -116,6 +116,8 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
                     ("raw_exports", "volume"),
                     ("orders_stream", "streaming_table"),
                 ]
+            if (catalog, schema) == ("shared_ref", "governance"):
+                entries.append(("mask_email", "function"))
             if (catalog, schema) == ("shared_ref", "ml"):
                 entries[-1] = ("demand_forecast", "registered_model")
             for name, kind in entries:
@@ -136,7 +138,8 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
         row_filter=RowFilterRef(
             function_full_name="shared_ref.governance.normalize_id",
             input_columns=("id",),
-            attached_via=AttachmentSource.DIRECT,
+            attached_via=AttachmentSource.ABAC_POLICY,
+            policy_id="fixture-policy-sales-sensitive-rows",
         ),
         columns=(
             replace(
@@ -160,6 +163,11 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
     customers = result["TABLE", "sales.crm.customers"]
     result["TABLE", customers.full_name] = replace(
         customers,
+        row_filter=RowFilterRef(
+            function_full_name="shared_ref.governance.normalize_id",
+            input_columns=("id",),
+            attached_via=AttachmentSource.DIRECT,
+        ),
         columns=(
             *customers.columns,
             Column(
@@ -171,7 +179,7 @@ def build_assets() -> dict[tuple[str, str], AssetDetail]:
                 tags=(),
                 mask=ColumnMaskRef(
                     column="email",
-                    function_full_name="shared_ref.governance.normalize_id",
+                    function_full_name="shared_ref.governance.mask_email",
                     using_columns=(),
                     attached_via=AttachmentSource.DIRECT,
                 ),

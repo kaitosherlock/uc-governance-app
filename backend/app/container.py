@@ -33,6 +33,7 @@ class Container:
                 grants=adapter,
                 principals=adapter,
                 dependencies=adapter,
+                functions=adapter,
                 tags=adapter,
                 policies=adapter,
                 privilege_codes=tuple(str(v) for v in values),

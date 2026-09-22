@@ -704,6 +704,190 @@
         }
       }
     },
+    "/api/v1/assets/TABLE/{full_name}/row-access": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Get Row Access Controls",
+        "operationId": "getRowAccessControls",
+        "parameters": [
+          {
+            "name": "full_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Full Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowAccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/functions/{full_name}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Get Function",
+        "operationId": "getFunction",
+        "parameters": [
+          {
+            "name": "full_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Full Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/assets/{securable_type}/{full_name}/dependencies": {
       "get": {
         "tags": [
@@ -3487,6 +3671,148 @@
         ],
         "title": "FieldError"
       },
+      "FunctionDetail": {
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "return_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Type"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/FunctionParameter"
+            },
+            "type": "array",
+            "title": "Parameters"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "dependents": {
+            "items": {
+              "$ref": "#/components/schemas/Dependency"
+            },
+            "type": "array",
+            "title": "Dependents"
+          },
+          "used_as_policy_function": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used As Policy Function"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/AllowedAction"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "full_name",
+          "owner",
+          "comment",
+          "return_type",
+          "parameters",
+          "language",
+          "dependents",
+          "used_as_policy_function",
+          "allowed_actions"
+        ],
+        "title": "FunctionDetail"
+      },
+      "FunctionDetailResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FunctionDetail"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "FunctionDetailResponse"
+      },
+      "FunctionParameter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_text": {
+            "type": "string",
+            "title": "Type Text"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type_text",
+          "position"
+        ],
+        "title": "FunctionParameter"
+      },
       "Grant": {
         "properties": {
           "principal": {
@@ -4468,6 +4794,67 @@
           "meta"
         ],
         "title": "PrivilegeListResponse"
+      },
+      "RowAccessData": {
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/AssetRef"
+          },
+          "row_filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowFilterRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "column_masks": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnMaskRef"
+            },
+            "type": "array",
+            "title": "Column Masks"
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/AllowedAction"
+            },
+            "type": "array",
+            "title": "Allowed Actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "row_filter",
+          "column_masks",
+          "allowed_actions"
+        ],
+        "title": "RowAccessData"
+      },
+      "RowAccessResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true,
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RowAccessData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "RowAccessResponse"
       },
       "RowFilterRef": {
         "properties": {

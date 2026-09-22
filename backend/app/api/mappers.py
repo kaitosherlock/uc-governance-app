@@ -93,6 +93,24 @@ def map_ColumnMaskRef(value: d.ColumnMaskRef) -> w.ColumnMaskRef:
     )
 
 
+def map_FunctionParameter(value: d.FunctionParameter) -> w.FunctionParameter:
+    return w.FunctionParameter(name=value.name, type_text=value.type_text, position=value.position)
+
+
+def map_FunctionDetail(value: d.FunctionDetail) -> w.FunctionDetail:
+    return w.FunctionDetail(
+        full_name=value.full_name,
+        owner=value.owner,
+        comment=value.comment,
+        return_type=value.return_type,
+        parameters=[map_FunctionParameter(item) for item in value.parameters],
+        language=value.language,
+        dependents=[map_Dependency(item) for item in value.dependents],
+        used_as_policy_function=value.used_as_policy_function,
+        allowed_actions=[map_AllowedAction(item) for item in value.allowed_actions],
+    )
+
+
 def map_Column(value: d.Column) -> w.Column:
     return w.Column(
         name=value.name,

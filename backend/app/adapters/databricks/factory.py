@@ -179,7 +179,7 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
     schemas = SchemasAdapter(cast("SchemasAPI", service("schemas")), cursors, key)
     tables = TablesAdapter(cast("TablesAPI", service("tables")), cursors, key)
     volumes = VolumesAdapter(cast("VolumesAPI", service("volumes")), cursors, key)
-    functions = FunctionsAdapter(cast("FunctionsAPI", service("functions", "sp")), cursors, key)
+    functions = FunctionsAdapter(cast("FunctionsAPI", service("functions")), cursors, key)
     models = ModelsAdapter(
         cast("RegisteredModelsAPI", service("registered_models", "sp")), cursors, key
     )
@@ -217,6 +217,7 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         grants=grants,
         principals=principals,
         dependencies=DependenciesAdapter(),
+        functions=functions,
         tags=tags,
         policies=policies,
         privilege_codes=tuple(p.value for p in Privilege),
