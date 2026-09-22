@@ -8,18 +8,24 @@
 # Every gate runs even if an earlier one fails, so one invocation reports all the damage rather
 # than only the first problem. Exits non-zero if any gate failed.
 #
-# Usage: scripts/check_all.sh [--skip-backend] [--skip-frontend]
+# Gate 4 is the end-to-end journey gate. It starts the Vite dev server with MSW and drives a
+# real Chromium, so it is the only gate that exercises the app as a user meets it. It is ON by
+# default: a gate that must be asked for is not a gate.
+#
+# Usage: scripts/check_all.sh [--skip-backend] [--skip-frontend] [--skip-e2e]
 
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKIP_BACKEND=0
 SKIP_FRONTEND=0
+SKIP_E2E=0
 
 for arg in "$@"; do
   case "$arg" in
     --skip-backend)  SKIP_BACKEND=1 ;;
     --skip-frontend) SKIP_FRONTEND=1 ;;
+    --skip-e2e)      SKIP_E2E=1 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -51,6 +57,10 @@ if [ "$SKIP_FRONTEND" -eq 0 ]; then
   check 'Gate 3  eslint' "$ROOT/frontend" npx eslint .
   check 'Gate 3  vitest' "$ROOT/frontend" npx vitest run
   check 'Gate 3  build'  "$ROOT/frontend" npx vite build
+fi
+
+if [ "$SKIP_E2E" -eq 0 ] && [ "$SKIP_FRONTEND" -eq 0 ]; then
+  check 'Gate 4  e2e'    "$ROOT/frontend" npx playwright test --reporter=list
 fi
 
 printf '\nSUMMARY\n'

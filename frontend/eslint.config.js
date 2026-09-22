@@ -13,7 +13,17 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 export default tseslint.config(
   // Global ignores
   {
-    ignores: ["dist", "node_modules", "coverage", "playwright-report", "test-results"],
+    // public/mockServiceWorker.js is generated verbatim by `npx msw init public --save`.
+    // It is vendor code, not ours, and editing it to satisfy a linter would be undone by
+    // the next regeneration.
+    ignores: [
+      "dist",
+      "node_modules",
+      "coverage",
+      "playwright-report",
+      "test-results",
+      "public/mockServiceWorker.js",
+    ],
   },
 
   // TypeScript-ESLint recommended (includes ESLint core recommended rules)

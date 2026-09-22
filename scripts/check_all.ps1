@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Run every verification gate for this project, in dependency order, and report honestly.
 
@@ -15,11 +15,17 @@
 
 .PARAMETER SkipBackend
     Skip the backend gates.
+
+.PARAMETER SkipE2E
+    Skip Gate 4, the end-to-end journey gate. Gate 4 starts the Vite dev server with MSW and
+    drives a real Chromium, so it is the only gate that exercises the app as a user meets it.
+    It is ON by default: a gate that must be asked for is not a gate.
 #>
 [CmdletBinding()]
 param(
     [switch]$SkipBackend,
-    [switch]$SkipFrontend
+    [switch]$SkipFrontend,
+    [switch]$SkipE2E
 )
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -66,6 +72,10 @@ if (-not $SkipFrontend) {
     Invoke-Check 'Gate 3  eslint' $frontend { npx eslint . }
     Invoke-Check 'Gate 3  vitest' $frontend { npx vitest run }
     Invoke-Check 'Gate 3  build'  $frontend { npx vite build }
+
+    if (-not $SkipE2E) {
+        Invoke-Check 'Gate 4  e2e'    $frontend { npx playwright test --reporter=list }
+    }
 }
 
 Write-Host ""
