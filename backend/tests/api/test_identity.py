@@ -55,13 +55,18 @@ def test_no_service_principal_fallback_on_failed_user_token(
     assert "fixture" not in response.text
 
 
-def test_connected_resolver_is_explicitly_unimplemented(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_connected_resolver_is_lazy_and_user_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.adapters.databricks.factory import SDKIdentityResolver
+
     app = connected_app(monkeypatch)
-    assert app.state.identity_resolver is None
+    assert isinstance(app.state.identity_resolver, SDKIdentityResolver)
+    resolver = AsyncMock()
+    resolver.resolve.side_effect = Unauthenticated()
+    app.state.identity_resolver = resolver
     with TestClient(app) as client:
         response = client.get("/api/v1/me", headers={"x-forwarded-access-token": "synthetic-token"})
-    assert response.status_code == 501
-    assert response.json()["code"] == "NOT_IMPLEMENTED"
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHENTICATED"
 
 
 @pytest.mark.parametrize(("headers", "expected"), [

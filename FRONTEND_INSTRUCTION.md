@@ -4,6 +4,22 @@ You own `frontend/**`, `screenshots/**`, `docs/07-design-brief.md`, `docs/browse
 `docs/a11y-manual-checks.md`. Read `AGENTS.md`, `docs/00-spec.md` §11–§12, and
 `docs/07-design-brief.md` first. On conflict: spec > `shared/contracts/api-spec.yaml` > this file.
 
+## 0. The one rule that ends your turn if you break it
+
+**Read files one at a time. Never read in parallel or in a batch, and never run a shell command.**
+
+This headless session auto-denies the `command` permission. Anything that needs it ends your turn
+immediately with nothing written, no matter how much you had planned. Three separate dispatches
+have already been lost this way. The triggers observed so far:
+
+- running `ls`, `npx`, `tsc`, `npm`, `eslint`, or any shell command;
+- checking whether a file exists;
+- reading several files "in parallel" or through a batch tool.
+
+So: open one path, read it, then open the next. If you are unsure whether a file exists, just write
+it; overwriting is expected. The orchestrator runs every build, lint, typecheck and test for you and
+sends the results back if something fails.
+
 ## 1. Tech stack (fixed unless P0-02 overturns it with recorded evidence)
 
 | Concern | Choice |

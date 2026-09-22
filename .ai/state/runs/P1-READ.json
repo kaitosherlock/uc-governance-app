@@ -2,16 +2,22 @@
     "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T040137Z-backend-P1-READ.log",
     "tier":  "tier_reasoning",
     "agent":  "backend",
-    "session_id":  null,
-    "model":  "gpt-6-astra",
-    "started_at":  "2026-09-22T04:01:37.6205805Z",
+    "session_id":  "01a0c746-c0fb-7c73-bce6-a81897f8c2ce",
+    "finished_at":  "2026-09-22T04:20:01.5915636Z",
+    "seconds":  1104,
     "prompt_chars":  9520,
+    "started_at":  "2026-09-22T04:01:37.6205805Z",
+    "quota_pattern":  "usage limit",
+    "model":  "gpt-6-astra",
+    "last_message_excerpt":  "",
     "history":  [
-                    "2026-09-22T04:01:37.6205805Z dispatched"
+                    "2026-09-22T04:01:37.6205805Z dispatched",
+                    "2026-09-22T04:20:01.6149709Z quota_exhausted"
                 ],
-    "effort":  "high",
     "task_id":  "P1-READ",
-    "status":  "dispatched",
+    "status":  "quota_exhausted",
+    "effort":  "high",
+    "exit_code":  1,
     "attempt":  1,
     "prompt_file":  ".ai/prompts/P1-READ.md"
 }

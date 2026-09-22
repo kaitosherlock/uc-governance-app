@@ -16,6 +16,7 @@ class AppError(Exception):
         self.http_status = http_status
         self.next_steps = next_steps or []
         self.errors = errors or []
+        self.details: dict[str, str] = {}
 
 
 class StandardError(AppError):

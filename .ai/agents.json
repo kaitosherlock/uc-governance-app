@@ -35,8 +35,8 @@
                                                          "tier_utility":  "low"
                                                      },
                                    "quota":  {
-                                                 "state":  "ok",
-                                                 "exhausted_at":  null,
+                                                 "state":  "exhausted",
+                                                 "exhausted_at":  "2026-09-22T04:20:01.6270726Z",
                                                  "last_ok_at":  "2026-09-22T03:59:33.7475259Z",
                                                  "note":  "Set to exhausted by dispatch.ps1 when the output matches a quota signature; cleared by resume.ps1 after a successful probe."
                                              },
@@ -89,7 +89,7 @@
                                     "quota":  {
                                                   "state":  "ok",
                                                   "exhausted_at":  null,
-                                                  "last_ok_at":  "2026-09-22T04:01:25.7290599Z",
+                                                  "last_ok_at":  "2026-09-22T04:03:40.0727130Z",
                                                   "note":  "Same handling as the backend lane."
                                               },
                                     "prompt_mode_reason":  "Windows PowerShell 5.1 re-splits a long multi-line native argument on whitespace, which turned prompt text such as --noEmit into a CLI flag. The prompt is written to a file and passed as one whitespace-free pointer token. Verified 2026-09-21.",

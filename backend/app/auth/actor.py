@@ -47,6 +47,12 @@ async def resolve_identity(
 
 
 async def current_identity(request: Request) -> Identity:
-    return await resolve_identity(
+    identity = await resolve_identity(
         request, request.app.state.settings, request.app.state.identity_resolver,
     )
+    # Only auth reads forwarded credentials. Reader construction performs no live calls.
+    request.state.read_access_token = (
+        "" if request.app.state.settings.mode == Mode.FIXTURE
+        else request.headers.get("x-forwarded-access-token", "").strip()
+    )
+    return identity

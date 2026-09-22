@@ -191,3 +191,168 @@ class Capability(ContractModel):
 
 class CapabilitiesResponse(SuccessResponse[list[Capability]]):
     pass
+
+
+# Phase 1 read DTOs.
+from app.domain.enums import (SecurableType, ObjectKind, ManagedStatus, ActionName, TagKind, AttachmentSource, DependencyKind, PrincipalKind, PrincipalScope, PrivilegeCategory, GrantSourceType)
+
+
+class AllowedAction(ContractModel):
+    action: ActionName
+    allowed: bool
+    reason_code: Literal['INHERITED_FROM_PARENT', 'ROLE_INSUFFICIENT', 'MODE_READ_ONLY', 'NOT_IMPLEMENTED', 'NOT_CONFIGURED', 'UNSUPPORTED_FOR_TYPE', 'PIPELINE_MANAGED', 'SYSTEM_TAG', 'OUT_OF_SCOPE', 'INSUFFICIENT_PRIVILEGES', 'UNKNOWN'] | None = None
+    reason: str | None = None
+    navigate_to: str | None = None
+
+
+class AssetRef(ContractModel):
+    securable_type: SecurableType
+    full_name: str
+    kind: ObjectKind
+    display_name: str
+
+
+class AssetSummary(ContractModel):
+    securable_type: SecurableType
+    full_name: str
+    kind: ObjectKind
+    display_name: str
+    owner: str | None
+    comment: str | None
+    updated_at: UtcTimestamp | None
+    managed: ManagedStatus
+    pipeline_managed: bool | None
+    allowed_actions: list[AllowedAction]
+
+
+class Tag(ContractModel):
+    key: str
+    value: str | None
+    kind: TagKind
+    allowed_actions: list[AllowedAction]
+
+
+class RowFilterRef(ContractModel):
+    function_full_name: str
+    input_columns: list[str]
+    attached_via: AttachmentSource
+    policy_id: str | None = None
+
+
+class ColumnMaskRef(ContractModel):
+    column: str
+    function_full_name: str
+    using_columns: list[str]
+    attached_via: AttachmentSource
+    policy_id: str | None = None
+
+
+class Column(ContractModel):
+    name: str
+    type_text: str
+    nullable: bool | None
+    comment: str | None
+    position: int
+    tags: list[Tag]
+    mask: ColumnMaskRef | None
+
+
+class AssetDetail(ContractModel):
+    securable_type: SecurableType
+    full_name: str
+    kind: ObjectKind
+    display_name: str
+    owner: str | None
+    comment: str | None
+    updated_at: UtcTimestamp | None
+    managed: ManagedStatus
+    pipeline_managed: bool | None
+    allowed_actions: list[AllowedAction]
+    properties: dict[str, str]
+    tags: list[Tag]
+    columns: list[Column]
+    row_filter: RowFilterRef | None
+    view_definition: str | None
+    storage_location: str | None
+    table_type: str | None
+    data_source_format: str | None
+    created_at: UtcTimestamp | None
+    created_by: str | None
+    parent: AssetRef | None
+    raw: dict[str, object]
+
+
+class Dependency(ContractModel):
+    kind: DependencyKind
+    full_name: str
+    source: DataSource
+    verified: bool
+
+
+class Principal(ContractModel):
+    name: str
+    display: str
+    kind: PrincipalKind
+    scope: PrincipalScope
+    uc_eligible: bool
+    id: str | None
+
+
+class Privilege(ContractModel):
+    code: str
+    label: str
+    description: str
+    category: PrivilegeCategory
+    securable_types: list[SecurableType]
+    prerequisites: list[str]
+
+
+class GrantSource(ContractModel):
+    type: GrantSourceType
+    securable_type: SecurableType | None
+    full_name: str | None
+
+
+class Grant(ContractModel):
+    principal: str
+    principal_kind: PrincipalKind | None
+    privilege: str
+    source: GrantSource
+    allowed_actions: list[AllowedAction]
+
+
+class GrantsData(ContractModel):
+    target: AssetRef
+    owner: str | None
+    direct: list[Grant]
+    inherited: list[Grant]
+    group_membership_loaded: bool
+
+
+class DependenciesData(ContractModel):
+    known: list[Dependency]
+    disclaimer: str
+
+
+class AssetListResponse(SuccessResponse[list[AssetSummary]]):
+    page: Page
+
+
+class AssetDetailResponse(SuccessResponse[AssetDetail]):
+    pass
+
+
+class DependenciesResponse(SuccessResponse[DependenciesData]):
+    pass
+
+
+class PrincipalListResponse(SuccessResponse[list[Principal]]):
+    page: Page
+
+
+class PrivilegeListResponse(SuccessResponse[list[Privilege]]):
+    pass
+
+
+class GrantsResponse(SuccessResponse[GrantsData]):
+    pass
