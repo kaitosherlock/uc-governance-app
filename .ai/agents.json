@@ -36,8 +36,8 @@
                                                      },
                                    "quota":  {
                                                  "state":  "ok",
-                                                 "exhausted_at":  "2026-09-22T09:03:50.5210527Z",
-                                                 "last_ok_at":  "2026-09-22T09:14:21.603731Z",
+                                                 "exhausted_at":  null,
+                                                 "last_ok_at":  "2026-09-22T09:54:57.4005387Z",
                                                  "note":  "Set to exhausted by dispatch.ps1 when the output matches a quota signature; cleared by resume.ps1 after a successful probe.",
                                                  "cleared_by":  "Corrected: the lane was never out of quota. It was flipped by the same detector false positive that mis-recorded P1-01-FIX. See quota_detection.marker_scoping_caveat."
                                              },
@@ -96,7 +96,7 @@
                                     "quota":  {
                                                   "state":  "ok",
                                                   "exhausted_at":  null,
-                                                  "last_ok_at":  "2026-09-22T09:29:48.0575320Z",
+                                                  "last_ok_at":  "2026-09-22T10:22:29.2540933Z",
                                                   "note":  "Same handling as the backend lane.",
                                                   "cleared_by":  "User reported the Antigravity Gemini dashboard at 2026-09-22 15:20 local: 94% of the weekly limit and 89% of the 5-hour limit remaining. The earlier exhaustion was per model on the higher tier, not lane-wide."
                                               },

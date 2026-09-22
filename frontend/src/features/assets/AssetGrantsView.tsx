@@ -3,6 +3,8 @@ import type {
   AllowedAction,
   Grant,
   GrantSource,
+  PlanChanges,
+  PlanKind,
   PrincipalKind,
   SecurableType,
 } from "@contracts/types";
@@ -20,6 +22,7 @@ import {
 import { useAssetGrants } from "@/api/queries";
 import { middleTruncate } from "@/lib/fqn";
 import { strings } from "@/lib/strings";
+import { PlanFlow } from "../plans/PlanFlow";
 import { AssetActionControl } from "./AssetActionControl";
 import {
   EmptySuccessView,
@@ -137,7 +140,13 @@ function GrantSourceBadge({ source }: { source: GrantSource }) {
   );
 }
 
-function GrantActionsCell({ actions }: { actions: AllowedAction[] }) {
+function GrantActionsCell({
+  actions,
+  onExecuteAction,
+}: {
+  actions: AllowedAction[];
+  onExecuteAction?: ((actionName: string) => void) | undefined;
+}) {
   if (!actions || actions.length === 0) {
     return (
       <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] italic">
@@ -149,7 +158,11 @@ function GrantActionsCell({ actions }: { actions: AllowedAction[] }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {actions.map((act, idx) => (
-        <AssetActionControl key={`${act.action}-${idx}`} action={act} />
+        <AssetActionControl
+          key={`${act.action}-${idx}`}
+          action={act}
+          onExecute={onExecuteAction}
+        />
       ))}
     </div>
   );
@@ -189,6 +202,10 @@ export function AssetGrantsView({
   const [sourceFilter, setSourceFilter] = useState<"" | "direct" | "inherited" | "unknown">("");
   const [sortField, setSortField] = useState<SortField>("principal");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [activePlanFlow, setActivePlanFlow] = useState<{
+    kind: PlanKind;
+    initialChanges?: PlanChanges;
+  } | null>(null);
 
   const grantsQuery = useAssetGrants(securableType, fullName);
   const grantsData = grantsQuery.data?.data;
@@ -303,11 +320,35 @@ export function AssetGrantsView({
   // 4. Success State — Empty Grants
   if (allGrants.length === 0) {
     return (
-      <div className={`max-w-6xl ${className}`}>
+      <div className={`max-w-6xl space-y-4 ${className}`}>
+        <div className="flex justify-end">
+          <AssetActionControl
+            action={{ action: "grant", allowed: true }}
+            onExecute={() => setActivePlanFlow({ kind: "grant" })}
+          />
+        </div>
         <EmptySuccessView
           message={strings.states.emptyGrants}
           meta={grantsQuery.data?.meta}
         />
+        {activePlanFlow && (
+          <PlanFlow
+            kind={activePlanFlow.kind}
+            targets={[
+              {
+                securable_type: (securableType as SecurableType) || "TABLE",
+                full_name: fullName,
+              },
+            ]}
+            initialChanges={activePlanFlow.initialChanges}
+            isOpen={true}
+            onClose={() => setActivePlanFlow(null)}
+            onSuccess={() => {
+              grantsQuery.refetch();
+              if (onRefresh) onRefresh();
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -398,16 +439,22 @@ export function AssetGrantsView({
             ) : null}
           </div>
 
-          {/* Grants count indicator */}
-          <div className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-[var(--weight-medium)] shrink-0">
-            {hasActiveFilters
-              ? strings.access.grantsTable.grantsCount
-                  .replace("{filtered}", String(sortedGrants.length))
-                  .replace("{total}", String(allGrants.length))
-              : strings.access.grantsTable.totalGrants.replace(
-                  "{total}",
-                  String(allGrants.length),
-                )}
+          {/* Grants count indicator & Grant action */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-[var(--weight-medium)]">
+              {hasActiveFilters
+                ? strings.access.grantsTable.grantsCount
+                    .replace("{filtered}", String(sortedGrants.length))
+                    .replace("{total}", String(allGrants.length))
+                : strings.access.grantsTable.totalGrants.replace(
+                    "{total}",
+                    String(allGrants.length),
+                  )}
+            </div>
+            <AssetActionControl
+              action={{ action: "grant", allowed: true }}
+              onExecute={() => setActivePlanFlow({ kind: "grant" })}
+            />
           </div>
         </div>
 
@@ -599,7 +646,20 @@ export function AssetGrantsView({
 
                   {/* Allowed Actions */}
                   <td className="px-4 py-3">
-                    <GrantActionsCell actions={grant.allowed_actions} />
+                    <GrantActionsCell
+                      actions={grant.allowed_actions}
+                      onExecuteAction={(actionName) => {
+                        if (actionName === "revoke") {
+                          setActivePlanFlow({
+                            kind: "revoke",
+                            initialChanges: {
+                              principal: grant.principal,
+                              privileges: [grant.privilege],
+                            },
+                          });
+                        }
+                      }}
+                    />
                   </td>
                 </tr>
               ))}
@@ -610,6 +670,26 @@ export function AssetGrantsView({
 
       {/* Mandatory Limitation line: renders meta.limitations under the data always */}
       <LimitationsView meta={grantsQuery.data?.meta} />
+
+      {/* Unified mutation lifecycle (PlanFlow) dialog */}
+      {activePlanFlow && (
+        <PlanFlow
+          kind={activePlanFlow.kind}
+          targets={[
+            {
+              securable_type: (securableType as SecurableType) || "TABLE",
+              full_name: fullName,
+            },
+          ]}
+          initialChanges={activePlanFlow.initialChanges}
+          isOpen={true}
+          onClose={() => setActivePlanFlow(null)}
+          onSuccess={() => {
+            grantsQuery.refetch();
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }

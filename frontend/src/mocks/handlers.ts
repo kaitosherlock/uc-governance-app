@@ -10,6 +10,7 @@
  * - slow: 2 second delay
  */
 import { delay, http, HttpResponse } from "msw";
+import type { PlanCreateRequest } from "@contracts/types";
 import contextFixture from "../../../shared/contracts/examples/ContextResponse.fixture.json";
 import errorForbiddenRole from "../../../shared/contracts/examples/ErrorResponse.forbidden-role.json";
 import errorNotConfigured from "../../../shared/contracts/examples/ErrorResponse.not-configured.json";
@@ -18,6 +19,7 @@ import identityFixture from "../../../shared/contracts/examples/IdentityResponse
 import operationUnknownOutcome from "../../../shared/contracts/examples/OperationResponse.unknown-outcome.json";
 import schemaObjectsFixture from "../../../shared/contracts/examples/AssetListResponse.list-schema-objects.json";
 import grantsFixture from "../../../shared/contracts/examples/GrantsResponse.orders-table.json";
+import planPreviewFixture from "../../../shared/contracts/examples/PlanResponse.grant-preview.json";
 
 const capabilitiesFixture = {
   success: true,
@@ -344,6 +346,242 @@ const dependenciesFixture = {
   },
 };
 
+const operationAppliedFixture = {
+  success: true,
+  data: {
+    id: "op-applied-001",
+    plan_id: "5f3c9a2e-1b7d-4e0a-9c11-2d6f8a0b1c22",
+    kind: "grant",
+    status: "applied",
+    identity: {
+      actor: {
+        id: "u-1001",
+        display: "alice.steward@example.test",
+        kind: "user",
+        roles: ["steward", "access_admin"],
+        verified_by: "fixture",
+      },
+      executor: {
+        kind: "service_principal",
+        display: "uc-governance-app (sp-7f3a…)",
+        reason: "The Unity Catalog grants API is not in the user-authorization scope set.",
+      },
+    },
+    started_at: "2026-09-21T09:06:00Z",
+    finished_at: "2026-09-21T09:06:05Z",
+    atomic: true,
+    targets: [
+      {
+        target: {
+          securable_type: "TABLE",
+          full_name: "sales.crm.orders",
+          kind: "table",
+          display_name: "orders",
+        },
+        status: "applied",
+        verified: true,
+        verified_at: "2026-09-21T09:06:05Z",
+        databricks_request_id: "req-001-abc",
+        error: null,
+        summary: "Granted SELECT to `marketing-analysts` on sales.crm.orders",
+      },
+    ],
+    reconcile_available: false,
+    summary: "Granted SELECT to `marketing-analysts` on sales.crm.orders",
+    correlation_id: "c0ffee00-0000-4000-8000-000000000005",
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:06:05Z",
+    scope: { catalog: "sales", schema: "crm" },
+    completeness: "complete",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000005",
+  },
+};
+
+const operationPartiallyAppliedFixture = {
+  success: true,
+  data: {
+    id: "op-partial-002",
+    plan_id: "5f3c9a2e-1b7d-4e0a-9c11-2d6f8a0b1c22",
+    kind: "grant",
+    status: "partially_applied",
+    identity: {
+      actor: {
+        id: "u-1001",
+        display: "alice.steward@example.test",
+        kind: "user",
+        roles: ["steward", "access_admin"],
+        verified_by: "fixture",
+      },
+      executor: {
+        kind: "service_principal",
+        display: "uc-governance-app (sp-7f3a…)",
+        reason: "The Unity Catalog grants API is not in the user-authorization scope set.",
+      },
+    },
+    started_at: "2026-09-21T09:06:00Z",
+    finished_at: "2026-09-21T09:06:05Z",
+    atomic: false,
+    targets: [
+      {
+        target: {
+          securable_type: "TABLE",
+          full_name: "sales.crm.orders",
+          kind: "table",
+          display_name: "orders",
+        },
+        status: "applied",
+        verified: true,
+        verified_at: "2026-09-21T09:06:05Z",
+        databricks_request_id: "req-001-abc",
+        error: null,
+        summary: "Granted SELECT on sales.crm.orders",
+      },
+      {
+        target: {
+          securable_type: "TABLE",
+          full_name: "sales.crm.customers",
+          kind: "table",
+          display_name: "customers",
+        },
+        status: "failed",
+        verified: false,
+        verified_at: null,
+        databricks_request_id: "req-002-def",
+        error: {
+          code: "INSUFFICIENT_PRIVILEGES",
+          message: "Service principal lacks MANAGE privilege on sales.crm.customers",
+        },
+        summary: "Failed to grant SELECT on sales.crm.customers",
+      },
+    ],
+    reconcile_available: false,
+    summary: "1 target succeeded, 1 target failed.",
+    correlation_id: "c0ffee00-0000-4000-8000-000000000005",
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:06:05Z",
+    scope: { catalog: "sales", schema: "crm" },
+    completeness: "partial_visibility",
+    limitations: ["Partial grant failure"],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000005",
+  },
+};
+
+const operationFailedFixture = {
+  success: true,
+  data: {
+    id: "op-failed-003",
+    plan_id: "5f3c9a2e-1b7d-4e0a-9c11-2d6f8a0b1c22",
+    kind: "grant",
+    status: "failed",
+    identity: {
+      actor: {
+        id: "u-1001",
+        display: "alice.steward@example.test",
+        kind: "user",
+        roles: ["steward", "access_admin"],
+        verified_by: "fixture",
+      },
+      executor: {
+        kind: "service_principal",
+        display: "uc-governance-app (sp-7f3a…)",
+        reason: "The Unity Catalog grants API is not in the user-authorization scope set.",
+      },
+    },
+    started_at: "2026-09-21T09:06:00Z",
+    finished_at: "2026-09-21T09:06:05Z",
+    atomic: true,
+    targets: [
+      {
+        target: {
+          securable_type: "TABLE",
+          full_name: "sales.crm.orders",
+          kind: "table",
+          display_name: "orders",
+        },
+        status: "failed",
+        verified: false,
+        verified_at: null,
+        databricks_request_id: "req-003-ghi",
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Upstream Databricks execution error applying grant.",
+        },
+        summary: "Failed to apply grant on sales.crm.orders",
+      },
+    ],
+    reconcile_available: false,
+    summary: "Failed to apply changes",
+    correlation_id: "c0ffee00-0000-4000-8000-000000000005",
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:06:05Z",
+    scope: { catalog: "sales", schema: "crm" },
+    completeness: "unknown",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000005",
+  },
+};
+
+const operationDuplicateFixture = {
+  success: true,
+  data: {
+    id: "op-duplicate-123",
+    plan_id: "5f3c9a2e-1b7d-4e0a-9c11-2d6f8a0b1c22",
+    kind: "grant",
+    status: "applied",
+    identity: {
+      actor: {
+        id: "u-1001",
+        display: "alice.steward@example.test",
+        kind: "user",
+        roles: ["steward", "access_admin"],
+        verified_by: "fixture",
+      },
+      executor: {
+        kind: "service_principal",
+        display: "uc-governance-app (sp-7f3a…)",
+        reason: "The Unity Catalog grants API is not in the user-authorization scope set.",
+      },
+    },
+    started_at: "2026-09-21T09:06:00Z",
+    finished_at: "2026-09-21T09:06:05Z",
+    atomic: true,
+    targets: [
+      {
+        target: {
+          securable_type: "TABLE",
+          full_name: "sales.crm.orders",
+          kind: "table",
+          display_name: "orders",
+        },
+        status: "applied",
+        verified: true,
+        verified_at: "2026-09-21T09:06:05Z",
+        databricks_request_id: "req-dup-001",
+        error: null,
+        summary: "Already applied for `marketing-analysts` on sales.crm.orders",
+      },
+    ],
+    reconcile_available: false,
+    summary: "Existing operation completed.",
+    correlation_id: "c0ffee00-0000-4000-8000-000000000006",
+  },
+  meta: {
+    source: "fixture",
+    observed_at: "2026-09-21T09:06:05Z",
+    scope: { catalog: "sales", schema: "crm" },
+    completeness: "complete",
+    limitations: [],
+    correlation_id: "c0ffee00-0000-4000-8000-000000000006",
+  },
+};
+
 async function handleScenario(
   scenario: string | null,
 ): Promise<Response | null> {
@@ -362,6 +600,55 @@ async function handleScenario(
   }
   if (scenario === "unknown-outcome") {
     return HttpResponse.json(operationUnknownOutcome, { status: 202 });
+  }
+  if (scenario === "stale") {
+    return HttpResponse.json(
+      {
+        success: false,
+        code: "PLAN_STALE",
+        message: "The state changed since this preview was generated.",
+        correlation_id: "c0ffee00-0000-4000-8000-000000000041",
+        next_steps: ["Regenerate the preview before applying this change."],
+      },
+      { status: 409 },
+    );
+  }
+  if (scenario === "expired") {
+    return HttpResponse.json(
+      {
+        success: false,
+        code: "PLAN_EXPIRED",
+        message: "This preview has expired.",
+        correlation_id: "c0ffee00-0000-4000-8000-000000000042",
+        next_steps: ["Regenerate the preview before applying this change."],
+      },
+      { status: 409 },
+    );
+  }
+  if (scenario === "invalidated") {
+    return HttpResponse.json(
+      {
+        success: false,
+        code: "PLAN_INVALIDATED",
+        message: "This preview has been invalidated.",
+        correlation_id: "c0ffee00-0000-4000-8000-000000000043",
+        next_steps: ["Regenerate the preview."],
+      },
+      { status: 409 },
+    );
+  }
+  if (scenario === "duplicate") {
+    return HttpResponse.json(
+      {
+        success: false,
+        code: "DUPLICATE_SUBMISSION",
+        message: "An operation already exists for this preview.",
+        correlation_id: "c0ffee00-0000-4000-8000-000000000044",
+        next_steps: ["Open the existing operation instead of submitting again."],
+        errors: [{ field: "operation_id", code: "DUPLICATE", message: "op-duplicate-123" }],
+      },
+      { status: 409 },
+    );
   }
   if (scenario === "not-found") {
     return HttpResponse.json(
@@ -651,5 +938,118 @@ export const handlers = [
     }
 
     return HttpResponse.json(assetDetailFixture);
+  }),
+
+  // Plans & Operations handlers (P1-08)
+  http.post("*/api/v1/plans", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario);
+    if (scenarioRes) return scenarioRes;
+
+    let body: Partial<PlanCreateRequest> = {};
+    try {
+      body = (await request.json()) as Partial<PlanCreateRequest>;
+    } catch {
+      // ignore
+    }
+
+    if (scenario === "typed-confirmation") {
+      return HttpResponse.json(
+        {
+          ...planPreviewFixture,
+          data: {
+            ...planPreviewFixture.data,
+            requires_typed_confirmation: true,
+            typed_confirmation_value: "sales.crm.orders",
+          },
+        },
+        { status: 201 },
+      );
+    }
+
+    const responseData = {
+      ...planPreviewFixture.data,
+      ...(body.kind ? { kind: body.kind } : {}),
+      ...(body.targets ? { targets: body.targets } : {}),
+    };
+
+    return HttpResponse.json(
+      {
+        ...planPreviewFixture,
+        data: responseData,
+      },
+      { status: 201 },
+    );
+  }),
+
+  http.get("*/api/v1/plans/:plan_id", async ({ request, params }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario);
+    if (scenarioRes) return scenarioRes;
+
+    return HttpResponse.json({
+      ...planPreviewFixture,
+      data: {
+        ...planPreviewFixture.data,
+        id: params.plan_id as string,
+      },
+    });
+  }),
+
+  http.post("*/api/v1/plans/:plan_id/execute", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario);
+    if (scenarioRes) return scenarioRes;
+
+    if (scenario === "unknown-outcome") {
+      return HttpResponse.json(operationUnknownOutcome, { status: 202 });
+    }
+    if (scenario === "partially-applied") {
+      return HttpResponse.json(operationPartiallyAppliedFixture, { status: 200 });
+    }
+    if (scenario === "failed") {
+      return HttpResponse.json(operationFailedFixture, { status: 200 });
+    }
+    if (scenario === "applied") {
+      return HttpResponse.json(operationAppliedFixture, { status: 200 });
+    }
+
+    return HttpResponse.json(operationAppliedFixture, { status: 200 });
+  }),
+
+  http.get("*/api/v1/operations/:operation_id", async ({ request, params }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario);
+    if (scenarioRes) return scenarioRes;
+
+    if (params.operation_id === "op-duplicate-123" || scenario === "duplicate") {
+      return HttpResponse.json(operationDuplicateFixture, { status: 200 });
+    }
+    if (scenario === "unknown-outcome") {
+      return HttpResponse.json(operationUnknownOutcome, { status: 200 });
+    }
+
+    return HttpResponse.json(operationAppliedFixture, { status: 200 });
+  }),
+
+  http.post("*/api/v1/operations/:operation_id/reconcile", async ({ request }) => {
+    const url = new URL(request.url);
+    const scenario = url.searchParams.get("scenario");
+    const scenarioRes = await handleScenario(scenario);
+    if (scenarioRes) return scenarioRes;
+
+    return HttpResponse.json({
+      ...operationAppliedFixture,
+      data: {
+        ...operationAppliedFixture.data,
+        status: "applied",
+        summary: "Operation reconciled: SELECT granted on sales.crm.orders",
+        reconcile_available: false,
+      },
+    });
   }),
 ];

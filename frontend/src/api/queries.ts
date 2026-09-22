@@ -5,7 +5,7 @@
  * Configured with sensible staleTime, retry disabling for 4xx errors,
  * and passes the query's AbortSignal to the API client.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   AssetDetail,
   AssetSummary,
@@ -15,13 +15,17 @@ import type {
   GrantsData,
   Identity,
   ObjectKind,
+  Operation,
   PagedResponse,
+  Plan,
+  PlanCreateRequest,
+  PlanExecuteRequest,
   Privilege,
   SecurableType,
   SuccessResponse,
 } from "@contracts/types";
 import { API_PATHS } from "@contracts/types";
-import { apiGet } from "./client";
+import { apiGet, apiPost } from "./client";
 import { isClientError } from "./errors";
 
 const DEFAULT_STALE_TIME = 5 * 60 * 1000; // 5 minutes
@@ -409,6 +413,65 @@ export function usePrivileges(
       if (isClientError(error)) return false;
       return failureCount < 3;
     },
+  });
+}
+
+/** Hook to create a plan (read-only preview). */
+export function useCreatePlan() {
+  return useMutation<SuccessResponse<Plan>, unknown, PlanCreateRequest>({
+    mutationFn: (body) => apiPost<Plan>(API_PATHS.plans, body),
+  });
+}
+
+/** Hook to fetch a plan by ID. */
+export function useGetPlan(planId: string | null | undefined) {
+  return useQuery<SuccessResponse<Plan>, unknown>({
+    queryKey: ["plan", planId ?? null],
+    queryFn: ({ signal }) => {
+      if (!planId) throw new Error("planId is required");
+      return apiGet<Plan>(API_PATHS.plan, { params: { plan_id: planId }, signal });
+    },
+    enabled: Boolean(planId),
+    retry: false,
+  });
+}
+
+export interface ExecutePlanVariables {
+  planId: string;
+  body: PlanExecuteRequest;
+}
+
+/** Hook to execute a confirmed plan. */
+export function useExecutePlan() {
+  return useMutation<SuccessResponse<Operation>, unknown, ExecutePlanVariables>({
+    mutationFn: ({ planId, body }) =>
+      apiPost<Operation>(API_PATHS.planExecute, body, { params: { plan_id: planId } }),
+  });
+}
+
+/** Hook to fetch an operation by ID. */
+export function useGetOperation(operationId: string | null | undefined) {
+  return useQuery<SuccessResponse<Operation>, unknown>({
+    queryKey: ["operation", operationId ?? null],
+    queryFn: ({ signal }) => {
+      if (!operationId) throw new Error("operationId is required");
+      return apiGet<Operation>(API_PATHS.operation, {
+        params: { operation_id: operationId },
+        signal,
+      });
+    },
+    enabled: Boolean(operationId),
+    retry: false,
+  });
+}
+
+/** Hook to reconcile an operation with unknown outcome. */
+export function useReconcileOperation() {
+  return useMutation<SuccessResponse<Operation>, unknown, string>({
+    mutationFn: (operationId) =>
+      apiPost<Operation>(API_PATHS.operationReconcile, undefined, {
+        params: { operation_id: operationId },
+      }),
   });
 }
 

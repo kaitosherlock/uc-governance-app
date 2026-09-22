@@ -434,6 +434,112 @@ export const strings = {
       body: "Operation outcome unknown. Check current state.",
     },
   },
+
+  /** Unified mutation lifecycle (PlanFlow) */
+  planFlow: {
+    dialogTitle: "Plan Governance Change",
+    dialogAriaLabel: "Governance mutation plan dialog",
+    dialogDescription:
+      "Preview and safely apply changes to Unity Catalog assets.",
+    kinds: {
+      grant: "Grant Privileges",
+      revoke: "Revoke Privileges",
+      transfer_ownership: "Transfer Ownership",
+      edit_metadata: "Edit Metadata",
+      delete_asset: "Delete Asset",
+      default: "Governance Mutation",
+    },
+    form: {
+      heading: "Change Details",
+      principal: "Principal",
+      principalPlaceholder: "Enter user, group, or service principal…",
+      principalRequired: "Principal is required.",
+      privilege: "Privilege",
+      privileges: "Privileges",
+      selectPrivilege: "Select a privilege",
+      privilegesRequired: "At least one privilege must be selected.",
+      newOwner: "New Owner",
+      newOwnerPlaceholder: "Enter new owner identity…",
+      newOwnerRequired: "New owner identity is required.",
+      comment: "Description / Comment",
+      commentPlaceholder: "Enter description or comment…",
+      reason: "Reason for change",
+      reasonPlaceholder: "Explain why this change is needed (at least 3 characters)…",
+      reasonRequired: "Reason must be at least 3 characters.",
+      reasonTooLong: "Reason must be 200 characters or fewer.",
+      previewButton: "Preview change",
+      previewingButton: "Generating preview…",
+      cancelButton: "Cancel",
+      targetLabel: "Target Asset",
+    },
+    preview: {
+      heading: "Preview Proposed Change",
+      normalizedChangesHeading: "Normalized Changes",
+      statementPreviewSummary: "Statement Preview",
+      prerequisitesHeading: "Prerequisite Notes",
+      inheritanceHeading: "Inheritance Note",
+      impactHeading: "Impact Analysis",
+      impactKnownHeading: "Known Impact",
+      impactUnknownHeading: "Unknown / Not Fully Determined Impact",
+      impactKnownEmpty: "No known impacts reported.",
+      impactUnknownEmpty: "No unverified or unknown impacts reported.",
+      identityHeading: "Execution Identity",
+      identitySentence:
+        "You are requesting this change. It will be executed by the application's service principal {display}.",
+      expiresIn: "Preview expires in:",
+      expiredNotice: "Preview expired — regenerate preview",
+      atomicNotice: "This change will be executed atomically.",
+      nonAtomicNotice:
+        "This change spans multiple targets and will be executed non-atomically.",
+    },
+    confirm: {
+      heading: "Confirm Execution",
+      standardButton: "Confirm and Apply",
+      executingButton: "Applying change…",
+      typedPrompt:
+        "Type {value} exactly to confirm this change:",
+      typedPlaceholder: "Type exact confirmation value",
+      typedMismatchNotice: "Typed value must match exactly before confirmation is enabled.",
+    },
+    outcome: {
+      heading: "Execution Outcome",
+      appliedTitle: "Change Applied",
+      appliedSummary: "The requested change has been applied and verified.",
+      partialTitle: "Change Partially Applied",
+      partialSummary:
+        "Some targets failed. Review the per-target outcomes below.",
+      failedTitle: "Execution Failed",
+      failedSummary: "The change could not be applied.",
+      unknownTitle: "Outcome Unknown",
+      unknownSummary:
+        "Outcome unknown. Check current state before retrying.",
+      checkCurrentState: "Check current state",
+      checkingState: "Checking current state…",
+      retry: "Retry",
+      verifiedBadge: "Verified",
+      unverifiedBadge: "Unverified",
+      targetsHeading: "Per-Target Results",
+      targetStatus: "Status: {status}",
+      errorHeading: "Error Details",
+      closeButton: "Close",
+    },
+    conflict: {
+      previewOutdated: "Preview outdated — regenerate",
+      previewOutdatedMessage:
+        "The observed state changed or the preview expired. Your form values have been preserved.",
+      planInvalidated: "A newer preview replaced this one",
+      planInvalidatedMessage:
+        "This preview was superseded by a newer preview request. Your form values have been preserved.",
+      planTampered: "Plan verification failed",
+      planTamperedMessage:
+        "The preview cryptographic verification failed (HMAC mismatch). This change cannot be applied.",
+      correlationIdLabel: "Correlation ID:",
+      regenerateButton: "Regenerate preview",
+      duplicateSubmission:
+        "An operation for this preview already exists. Showing existing operation.",
+      duplicateNotice: "Showing existing operation.",
+    },
+  },
 } as const;
 
 export type Strings = typeof strings;
