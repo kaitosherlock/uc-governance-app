@@ -7,9 +7,11 @@ from app.domain.models import (
     AssetDetail,
     AssetSummary,
     DependenciesData,
+    ExternalLocation,
     FunctionDetail,
     Grant,
     Principal,
+    StorageCredential,
     Tag,
     TagPolicy,
 )
@@ -94,3 +96,13 @@ class PolicyReader(Protocol):
 
 class FunctionReader(Protocol):
     def get_function(self, full_name: str) -> FunctionDetail: ...
+
+
+class StorageReader(Protocol):
+    def list_storage_credentials(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[StorageCredential], str | None]: ...
+
+    def list_external_locations(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[ExternalLocation], str | None]: ...

@@ -31,6 +31,8 @@ READ_CALLS: dict[str, tuple[str, str]] = {
     "getFunction": ("GET", "/api/v1/functions/shared_ref.governance.normalize_id"),
     "listTagPolicies": ("GET", "/api/v1/tag-policies"),
     "listAbacPolicies": ("GET", "/api/v1/abac-policies"),
+    "listStorageCredentials": ("GET", "/api/v1/storage-credentials"),
+    "listExternalLocations": ("GET", "/api/v1/external-locations"),
     "getAbacPolicy": ("GET", "/api/v1/abac-policies/fixture-policy-sales-sensitive-rows"),
     "previewAbacPolicyImpact": (
         "GET",

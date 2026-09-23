@@ -374,6 +374,73 @@ def list_tag_policies(
 
 
 @router.get(
+    "/storage-credentials",
+    response_model=w.StorageCredentialListResponse,
+    operation_id="listStorageCredentials",
+    responses=responses(401, 403, 500, 501, 503),
+)
+def list_storage_credentials(
+    request: Request,
+    svc: Service,
+    page_size: PageSize = 50,
+    page_token: str | None = None,
+) -> w.StorageCredentialListResponse:
+    values, token = svc.storage_credentials(page_size, page_token)
+    return w.StorageCredentialListResponse(
+        success=True,
+        data=[mappers.map_StorageCredential(value) for value in values],
+        meta=meta(
+            request,
+            svc,
+            limitations=[
+                "A Unity Catalog storage credential and its visibility do not prove that the "
+                "underlying cloud IAM role, managed identity, or service account can access "
+                "storage. Cloud IAM is configured outside Unity Catalog and was not checked.",
+                "read_only and isolation_mode are Unity Catalog declarations, not observations "
+                "of effective cloud permissions.",
+            ],
+            next_token=token,
+            partial=True,
+        ),
+        page=w.Page(page_size=page_size, next_page_token=token),
+    )
+
+
+@router.get(
+    "/external-locations",
+    response_model=w.ExternalLocationListResponse,
+    operation_id="listExternalLocations",
+    responses=responses(401, 403, 500, 501, 503),
+)
+def list_external_locations(
+    request: Request,
+    svc: Service,
+    page_size: PageSize = 50,
+    page_token: str | None = None,
+) -> w.ExternalLocationListResponse:
+    values, token = svc.external_locations(page_size, page_token)
+    return w.ExternalLocationListResponse(
+        success=True,
+        data=[mappers.map_ExternalLocation(value) for value in values],
+        meta=meta(
+            request,
+            svc,
+            limitations=[
+                "An external location and its Unity Catalog storage credential do not prove "
+                "that the underlying cloud IAM role, managed identity, or service account can "
+                "access storage. Cloud IAM is configured outside Unity Catalog and was not "
+                "checked.",
+                "read_only and isolation_mode are Unity Catalog declarations, not observations "
+                "of effective cloud permissions.",
+            ],
+            next_token=token,
+            partial=True,
+        ),
+        page=w.Page(page_size=page_size, next_page_token=token),
+    )
+
+
+@router.get(
     "/abac-policies",
     response_model=w.AbacPolicyListResponse,
     operation_id="listAbacPolicies",

@@ -83,6 +83,34 @@ class TagPolicy:
 
 
 @dataclass(frozen=True, kw_only=True)
+class StorageCredential:
+    name: str
+    owner: str | None
+    cloud_provider: Literal[
+        "aws_iam_role", "azure_managed_identity", "gcp_service_account", "unknown"
+    ] | None
+    read_only: bool | None
+    isolation_mode: Literal["ISOLATION_MODE_OPEN", "ISOLATION_MODE_ISOLATED"] | None
+    comment: str | None
+    created_at: datetime | None
+    used_for_managed_storage: bool | None
+    allowed_actions: tuple[AllowedAction, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
+class ExternalLocation:
+    name: str
+    url: str
+    credential_name: str | None
+    owner: str | None
+    read_only: bool | None
+    isolation_mode: Literal["ISOLATION_MODE_OPEN", "ISOLATION_MODE_ISOLATED"] | None
+    comment: str | None
+    created_at: datetime | None
+    allowed_actions: tuple[AllowedAction, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
 class AbacPolicy:
     id: str
     name: str

@@ -478,6 +478,40 @@ class FunctionDetailResponse(SuccessResponse[FunctionDetail]):
     pass
 
 
+class StorageCredential(ContractModel):
+    name: str
+    owner: str | None
+    cloud_provider: Literal[
+        "aws_iam_role", "azure_managed_identity", "gcp_service_account", "unknown"
+    ] | None
+    read_only: bool | None
+    isolation_mode: Literal["ISOLATION_MODE_OPEN", "ISOLATION_MODE_ISOLATED"] | None
+    comment: str | None
+    created_at: UtcTimestamp | None
+    used_for_managed_storage: bool | None
+    allowed_actions: list[AllowedAction]
+
+
+class StorageCredentialListResponse(SuccessResponse[list[StorageCredential]]):
+    page: Page
+
+
+class ExternalLocation(ContractModel):
+    name: str
+    url: str
+    credential_name: str | None
+    owner: str | None
+    read_only: bool | None
+    isolation_mode: Literal["ISOLATION_MODE_OPEN", "ISOLATION_MODE_ISOLATED"] | None
+    comment: str | None
+    created_at: UtcTimestamp | None
+    allowed_actions: list[AllowedAction]
+
+
+class ExternalLocationListResponse(SuccessResponse[list[ExternalLocation]]):
+    page: Page
+
+
 class PlanKind(StrEnum):
     GRANT = "grant"
     REVOKE = "revoke"

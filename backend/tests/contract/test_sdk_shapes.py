@@ -244,6 +244,32 @@ SDK_OPERATIONS: list[tuple[str, str, tuple[str, ...]]] = [
 
 # Fields the planned allowlisted mappers actually need, including nested DTOs.
 DTO_FIELDS = {
+    ("storage_credentials", "list"): {
+        "databricks.sdk.service.catalog.StorageCredentialInfo": (
+            "name",
+            "owner",
+            "read_only",
+            "isolation_mode",
+            "comment",
+            "created_at",
+            "used_for_managed_storage",
+            "aws_iam_role",
+            "azure_managed_identity",
+            "databricks_gcp_service_account",
+        ),
+    },
+    ("external_locations", "list"): {
+        "databricks.sdk.service.catalog.ExternalLocationInfo": (
+            "name",
+            "url",
+            "credential_name",
+            "owner",
+            "read_only",
+            "isolation_mode",
+            "comment",
+            "created_at",
+        ),
+    },
     ("policies", "create_policy"): {
         "databricks.sdk.service.catalog.PolicyInfo": (
             "id",

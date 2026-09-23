@@ -1,0 +1,23 @@
+{
+    "log":  "C:\\Users\\admin\\Downloads\\uc-governance-app\\.ai\\logs\\20260922T172204Z-backend-P2-02.log",
+    "tier":  "tier_reasoning",
+    "agent":  "backend",
+    "session_id":  "01a0ca23-99dd-71c1-98ce-9ab47fe2c96c",
+    "finished_at":  "2026-09-22T17:26:54.7762774Z",
+    "seconds":  290,
+    "prompt_chars":  3898,
+    "started_at":  "2026-09-22T17:22:04.8073287Z",
+    "quota_pattern":  "",
+    "model":  "gpt-5.6-terra",
+    "last_message_excerpt":  "Completed P2-02 with the unsupported-observation outcome.\n\n- SDK 0.140.0 exposes catalog configuration CRUD, including `get_catalog_config`, but `get_results` is absent. `CatalogConfig` contains configuration only; `TableInfo` and `ColumnInfo` expose no scan-status or classification-result fields.\n- No endpoint or heuristic classifier was added. The frozen API contract has no configuration route.\n- `classification.read` now reports `unsupported_in_environment` with an evidence-based reason; API and registry tests cover it.\n- The matrix explicitly distinguishes classification-carrying tags from evidence of detection, scan coverage, freshness, masking, or access restriction: [capability-matrix.md](C:/Users/admin/Downloads/uc-governance-app/docs/capability-matrix.md:150).\n\nChecks: Ruff passed; mypy passed (59 files); focused tests passed (10); SDK-shape tests passed (164). Full pytest remains sandbox-blocked during collection by denied access to `jsonschema_specifications/.../metaschema.json`.",
+    "history":  [
+                    "2026-09-22T17:22:04.8194265Z dispatched",
+                    "2026-09-22T17:26:54.7888225Z completed"
+                ],
+    "task_id":  "P2-02",
+    "status":  "completed",
+    "effort":  "high",
+    "exit_code":  0,
+    "attempt":  1,
+    "prompt_file":  ".ai/prompts/P2-02.md"
+}

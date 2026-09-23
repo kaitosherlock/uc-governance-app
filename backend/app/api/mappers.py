@@ -111,6 +111,34 @@ def map_FunctionDetail(value: d.FunctionDetail) -> w.FunctionDetail:
     )
 
 
+def map_StorageCredential(value: d.StorageCredential) -> w.StorageCredential:
+    return w.StorageCredential(
+        name=value.name,
+        owner=value.owner,
+        cloud_provider=value.cloud_provider,
+        read_only=value.read_only,
+        isolation_mode=value.isolation_mode,
+        comment=value.comment,
+        created_at=value.created_at,
+        used_for_managed_storage=value.used_for_managed_storage,
+        allowed_actions=[map_AllowedAction(item) for item in value.allowed_actions],
+    )
+
+
+def map_ExternalLocation(value: d.ExternalLocation) -> w.ExternalLocation:
+    return w.ExternalLocation(
+        name=value.name,
+        url=value.url,
+        credential_name=value.credential_name,
+        owner=value.owner,
+        read_only=value.read_only,
+        isolation_mode=value.isolation_mode,
+        comment=value.comment,
+        created_at=value.created_at,
+        allowed_actions=[map_AllowedAction(item) for item in value.allowed_actions],
+    )
+
+
 def map_Column(value: d.Column) -> w.Column:
     return w.Column(
         name=value.name,

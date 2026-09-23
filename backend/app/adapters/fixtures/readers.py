@@ -14,12 +14,14 @@ from app.domain.models import (
     ColumnMaskRef,
     DependenciesData,
     Dependency,
+    ExternalLocation,
     FunctionDetail,
     FunctionParameter,
     Grant,
     GrantSource,
     Principal,
     RowFilterRef,
+    StorageCredential,
     Tag,
     TagPolicy,
 )
@@ -60,6 +62,53 @@ class FixtureReaders:
         self.grants = build_grants()
         self.tag_policies = build_tag_policies()
         self.abac_policies = {value.id: value for value in build_abac_policies()}
+        self.storage_credentials = (
+            StorageCredential(
+                name="fixture-sales-storage",
+                owner="data-eng-owners",
+                cloud_provider="aws_iam_role",
+                read_only=False,
+                isolation_mode="ISOLATION_MODE_OPEN",
+                comment="Synthetic storage credential metadata.",
+                created_at=datetime(2026, 9, 20, 23, 10, 44, tzinfo=UTC),
+                used_for_managed_storage=False,
+                allowed_actions=(),
+            ),
+            StorageCredential(
+                name="fixture-analytics-storage",
+                owner="analytics-owners",
+                cloud_provider="azure_managed_identity",
+                read_only=True,
+                isolation_mode="ISOLATION_MODE_ISOLATED",
+                comment="Synthetic isolated credential metadata.",
+                created_at=datetime(2026, 9, 20, 23, 10, 44, tzinfo=UTC),
+                used_for_managed_storage=None,
+                allowed_actions=(),
+            ),
+        )
+        self.external_locations = (
+            ExternalLocation(
+                name="fixture-sales-landing",
+                url="s3://fixture-sales-landing/",
+                credential_name="fixture-sales-storage",
+                owner="data-eng-owners",
+                read_only=False,
+                isolation_mode="ISOLATION_MODE_OPEN",
+                comment="Synthetic sales landing location.",
+                created_at=datetime(2026, 9, 20, 23, 10, 44, tzinfo=UTC),
+                allowed_actions=(),
+            ),
+        )
+
+    def list_storage_credentials(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[StorageCredential], str | None]:
+        return page(list(self.storage_credentials), page_size, page_token, "storage-credentials")
+
+    def list_external_locations(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[ExternalLocation], str | None]:
+        return page(list(self.external_locations), page_size, page_token, "external-locations")
 
     def list_catalogs(
         self, page_size: int, page_token: str | None

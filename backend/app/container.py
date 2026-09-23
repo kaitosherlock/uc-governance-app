@@ -36,6 +36,7 @@ class Container:
                 functions=adapter,
                 tags=adapter,
                 policies=adapter,
+                storage=adapter,
                 privilege_codes=tuple(str(v) for v in values),
             )
             registry = PlanKindRegistry()

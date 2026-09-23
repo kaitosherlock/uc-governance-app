@@ -13,6 +13,7 @@ from app.adapters.databricks.models import ModelsAdapter
 from app.adapters.databricks.policies import PoliciesAdapter
 from app.adapters.databricks.principals import PrincipalsAdapter
 from app.adapters.databricks.schemas import SchemasAdapter
+from app.adapters.databricks.storage import StorageAdapter
 from app.adapters.databricks.tables import TablesAdapter
 from app.adapters.databricks.tags import TagsAdapter
 from app.adapters.databricks.volumes import VolumesAdapter
@@ -29,11 +30,13 @@ if TYPE_CHECKING:
     from databricks.sdk.service.catalog import (
         CatalogsAPI,
         EntityTagAssignmentsAPI,
+        ExternalLocationsAPI,
         FunctionsAPI,
         GrantsAPI,
         PoliciesAPI,
         RegisteredModelsAPI,
         SchemasAPI,
+        StorageCredentialsAPI,
         TablesAPI,
         VolumesAPI,
     )
@@ -191,6 +194,12 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         key,
     )
     policies = PoliciesAdapter(cast("PoliciesAPI", service("policies")), cursors, key)
+    storage = StorageAdapter(
+        cast("StorageCredentialsAPI", service("storage_credentials")),
+        cast("ExternalLocationsAPI", service("external_locations")),
+        cursors,
+        key,
+    )
     principals = PrincipalsAdapter(
         cast("UsersAPI", service("users", "sp")),
         cast("GroupsAPI", service("groups", "sp")),
@@ -220,5 +229,6 @@ def sdk_readers(settings: Settings, access_token: str, cursors: CursorStore) -> 
         functions=functions,
         tags=tags,
         policies=policies,
+        storage=storage,
         privilege_codes=tuple(p.value for p in Privilege),
     )

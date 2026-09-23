@@ -12,6 +12,7 @@ from app.adapters.protocols import (
     PolicyReader,
     PrincipalReader,
     SchemaReader,
+    StorageReader,
     TagReader,
 )
 from app.api.v1.models import ErrorCode, Identity
@@ -23,9 +24,11 @@ from app.domain.models import (
     AllowedAction,
     AssetDetail,
     AssetSummary,
+    ExternalLocation,
     FunctionDetail,
     Grant,
     GrantsData,
+    StorageCredential,
     Tag,
     TagPolicy,
 )
@@ -49,6 +52,7 @@ class Readers:
     functions: FunctionReader
     tags: TagReader
     policies: PolicyReader
+    storage: StorageReader
     privilege_codes: tuple[str, ...]
 
 
@@ -229,6 +233,52 @@ class ReadService:
         self.authorize("tag_policies.read")
         values, token = self.readers.tags.list_tag_policies(page_size, page_token)
         return [self.tag_policy(value) for value in values], token
+
+    def storage_action(self, action: ActionName) -> AllowedAction:
+        if self.settings.mode.value == "connected_readonly":
+            return self.action(action, None)
+        noun = "storage credential or external location"
+        if action == ActionName.DELETE:
+            return AllowedAction(
+                action=action,
+                allowed=False,
+                reason_code="NOT_IMPLEMENTED",
+                reason=(
+                    "The frozen API contract defines no delete route or plan kind for this "
+                    f"{noun}; delete_asset is not applied to this type."
+                ),
+            )
+        return AllowedAction(
+            action=action,
+            allowed=False,
+            reason_code="NOT_IMPLEMENTED",
+            reason=(
+                "The frozen API contract defines no route or plan kind for this "
+                f"{action.value.replace('_', ' ')} action on a {noun}."
+            ),
+        )
+
+    def storage_credentials(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[StorageCredential], str | None]:
+        self.authorize("storage.read")
+        values, token = self.readers.storage.list_storage_credentials(page_size, page_token)
+        actions = tuple(
+            self.storage_action(action)
+            for action in (ActionName.EDIT_METADATA, ActionName.DELETE, ActionName.VALIDATE)
+        )
+        return [replace(value, allowed_actions=actions) for value in values], token
+
+    def external_locations(
+        self, page_size: int, page_token: str | None
+    ) -> tuple[list[ExternalLocation], str | None]:
+        self.authorize("storage.read")
+        values, token = self.readers.storage.list_external_locations(page_size, page_token)
+        actions = tuple(
+            self.storage_action(action)
+            for action in (ActionName.EDIT_METADATA, ActionName.DELETE, ActionName.VALIDATE)
+        )
+        return [replace(value, allowed_actions=actions) for value in values], token
 
     def abac_policies(
         self, scope_full_name: str | None, page_size: int, page_token: str | None

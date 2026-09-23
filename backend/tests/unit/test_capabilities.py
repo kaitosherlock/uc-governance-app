@@ -22,8 +22,10 @@ def test_only_implemented_capabilities_available() -> None:
         "tag_policies.read",
             "abac_policies.read",
             "abac_policies.update",
-            "filters.read",
-            "filters.update",
+        "filters.read",
+        "filters.update",
+        "storage_credentials.read",
+        "external_locations.read",
             "plans.lifecycle_core",
         "plans.read",
         "operations.read",
@@ -56,3 +58,26 @@ def test_classification_results_are_reported_unsupported_with_evidence() -> None
     assert reported.reason is not None
     assert "0.140.0" in reported.reason
     assert "results" in reported.reason
+
+
+def test_storage_capabilities_match_the_frozen_contract() -> None:
+    values = {row.capability: row for row in REGISTRY if row.domain == "7.6"}
+
+    assert values["storage_credentials.read"].status == Status.AVAILABLE
+    assert values["external_locations.read"].status == Status.AVAILABLE
+    for capability in (
+        "storage_credentials.create",
+        "storage_credentials.update",
+        "storage_credentials.delete",
+        "storage_credentials.validate",
+        "external_locations.create",
+        "external_locations.update",
+        "external_locations.delete",
+        "external_locations.validate",
+        "service_credentials.read",
+        "service_credentials.update",
+    ):
+        reported = probe(values[capability], Settings())
+        assert reported.status == Status.NOT_IMPLEMENTED
+        assert reported.reason is not None
+        assert "frozen contract" in reported.reason
